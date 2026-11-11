@@ -8,7 +8,31 @@
   "plural": false
  },
  {
+  "source": "%1 can't be created.",
+  "plural": false
+ },
+ {
   "source": "%1 can't be opened.",
+  "plural": false
+ },
+ {
+  "source": "%1 d ago",
+  "plural": false
+ },
+ {
+  "source": "%1 file",
+  "plural": false
+ },
+ {
+  "source": "%1 free",
+  "plural": false
+ },
+ {
+  "source": "%1 h ago",
+  "plural": false
+ },
+ {
+  "source": "%1 min ago",
   "plural": false
  },
  {
@@ -20,8 +44,24 @@
   "plural": false
  },
  {
+  "source": "%1 of this folder",
+  "plural": false
+ },
+ {
+  "source": "%1 shown",
+  "plural": false
+ },
+ {
   "source": "%1 will be deleted permanently. This can't be undone.",
   "plural": false
+ },
+ {
+  "source": "%n commands",
+  "plural": true
+ },
+ {
+  "source": "%n entries",
+  "plural": true
  },
  {
   "source": "%n items",
@@ -32,11 +72,27 @@
   "plural": true
  },
  {
+  "source": "%n marked",
+  "plural": true
+ },
+ {
   "source": "A name can't be empty, contain / or be . or ..",
   "plural": false
  },
  {
-  "source": "Add or remove one from the selection",
+  "source": "A path, >command or :place",
+  "plural": false
+ },
+ {
+  "source": "Actions",
+  "plural": false
+ },
+ {
+  "source": "Actions / Preferences",
+  "plural": false
+ },
+ {
+  "source": "Appearance",
   "plural": false
  },
  {
@@ -44,15 +100,67 @@
   "plural": false
  },
  {
-  "source": "Back / forward (or the mouse's thumb buttons)",
+  "source": "Archive",
   "plural": false
  },
  {
-  "source": "Biggest first (S)",
+  "source": "Audio",
+  "plural": false
+ },
+ {
+  "source": "Back",
+  "plural": false
+ },
+ {
+  "source": "Back / forward",
+  "plural": false
+ },
+ {
+  "source": "Calculate",
+  "plural": false
+ },
+ {
+  "source": "Calculate listed folders",
+  "plural": false
+ },
+ {
+  "source": "Calculate size",
+  "plural": false
+ },
+ {
+  "source": "Calculate sizes automatically",
+  "plural": false
+ },
+ {
+  "source": "Calculate the folder's size",
+  "plural": false
+ },
+ {
+  "source": "Calculating…",
   "plural": false
  },
  {
   "source": "Cancel",
+  "plural": false
+ },
+ {
+  "source": "change column",
+  "plural": false
+ },
+ {
+  "source": "Clear filter",
+  "plural": false
+ },
+ {
+  "source": "Clear selection",
+  "plural": false
+ },
+ {
+  "source": "Clear the selection",
+  "plural": false
+ },
+ {
+  "source": "Clipboard",
   "plural": false
  },
  {
@@ -64,15 +172,19 @@
   "plural": false
  },
  {
-  "source": "Close the window",
+  "source": "Close tab",
   "plural": false
  },
  {
-  "source": "Close this pane (Ctrl+W)",
+  "source": "Code",
   "plural": false
  },
  {
-  "source": "Columns (Ctrl+3); click for grid",
+  "source": "Columns",
+  "plural": false
+ },
+ {
+  "source": "Commands",
   "plural": false
  },
  {
@@ -84,11 +196,19 @@
   "plural": false
  },
  {
+  "source": "Compress…",
+  "plural": false
+ },
+ {
   "source": "Connect",
   "plural": false
  },
  {
   "source": "Connecting to %1…",
+  "plural": false
+ },
+ {
+  "source": "Context menu",
   "plural": false
  },
  {
@@ -108,11 +228,23 @@
   "plural": false
  },
  {
-  "source": "Copy Path",
+  "source": "Copy %1 to:",
   "plural": false
  },
  {
-  "source": "Copy the path as text",
+  "source": "Copy / move (to the other pane)",
+  "plural": false
+ },
+ {
+  "source": "Copy path",
+  "plural": false
+ },
+ {
+  "source": "Copy the path",
+  "plural": false
+ },
+ {
+  "source": "Copy to…",
   "plural": false
  },
  {
@@ -132,6 +264,26 @@
   "plural": false
  },
  {
+  "source": "counting…",
+  "plural": false
+ },
+ {
+  "source": "Create",
+  "plural": false
+ },
+ {
+  "source": "Create and organize",
+  "plural": false
+ },
+ {
+  "source": "Create file",
+  "plural": false
+ },
+ {
+  "source": "Create folder",
+  "plural": false
+ },
+ {
   "source": "Ctrl+Z undoes",
   "plural": false
  },
@@ -144,12 +296,16 @@
   "plural": true
  },
  {
-  "source": "Delete",
+  "source": "Data",
   "plural": false
  },
  {
-  "source": "Delete %n Items",
-  "plural": true
+  "source": "Date",
+  "plural": false
+ },
+ {
+  "source": "Delete",
+  "plural": false
  },
  {
   "source": "Delete for good?",
@@ -176,19 +332,19 @@
   "plural": false
  },
  {
-  "source": "Details (Ctrl+I)",
-  "plural": false
- },
- {
-  "source": "Dimensions",
-  "plural": false
- },
- {
   "source": "Dismiss",
   "plural": false
  },
  {
+  "source": "Document",
+  "plural": false
+ },
+ {
   "source": "Documents",
+  "plural": false
+ },
+ {
+  "source": "Does not follow links",
   "plural": false
  },
  {
@@ -197,10 +353,6 @@
  },
  {
   "source": "Downloads",
-  "plural": false
- },
- {
-  "source": "Drag on empty space",
   "plural": false
  },
  {
@@ -220,11 +372,31 @@
   "plural": false
  },
  {
+  "source": "Dual pane",
+  "plural": false
+ },
+ {
+  "source": "Dual pane / switch pane",
+  "plural": false
+ },
+ {
   "source": "Duplicate",
   "plural": false
  },
  {
   "source": "Duplicating",
+  "plural": false
+ },
+ {
+  "source": "Edit path",
+  "plural": false
+ },
+ {
+  "source": "Edit the filter",
+  "plural": false
+ },
+ {
+  "source": "Edit the path; >command or :place opens a catalog",
   "plural": false
  },
  {
@@ -248,11 +420,27 @@
   "plural": false
  },
  {
-  "source": "Everything else",
+  "source": "Enter / double click",
   "plural": false
  },
  {
-  "source": "Extract Here",
+  "source": "Enter opens a folder · Backspace goes up",
+  "plural": false
+ },
+ {
+  "source": "Enter opens it",
+  "plural": false
+ },
+ {
+  "source": "Enter opens · Backspace goes up",
+  "plural": false
+ },
+ {
+  "source": "Executable",
+  "plural": false
+ },
+ {
+  "source": "Extract here",
   "plural": false
  },
  {
@@ -260,7 +448,27 @@
   "plural": false
  },
  {
+  "source": "File",
+  "plural": false
+ },
+ {
+  "source": "Filter this folder",
+  "plural": false
+ },
+ {
+  "source": "Filter this folder (Esc clears)",
+  "plural": false
+ },
+ {
   "source": "Folder",
+  "plural": false
+ },
+ {
+  "source": "Font",
+  "plural": false
+ },
+ {
+  "source": "Forward",
   "plural": false
  },
  {
@@ -280,11 +488,15 @@
   "plural": false
  },
  {
-  "source": "Grid (Ctrl+1); click for list",
+  "source": "Grid",
   "plural": false
  },
  {
-  "source": "Grid, list or columns",
+  "source": "Groups",
+  "plural": false
+ },
+ {
+  "source": "Groups, List, Columns, Space, Grid",
   "plural": false
  },
  {
@@ -292,11 +504,27 @@
   "plural": false
  },
  {
+  "source": "History and results",
+  "plural": false
+ },
+ {
   "source": "Home",
   "plural": false
  },
  {
-  "source": "In list and columns: into a folder / back out",
+  "source": "Image",
+  "plural": false
+ },
+ {
+  "source": "INSPECTOR",
+  "plural": false
+ },
+ {
+  "source": "Inspector",
+  "plural": false
+ },
+ {
+  "source": "Invert selection",
   "plural": false
  },
  {
@@ -304,11 +532,23 @@
   "plural": false
  },
  {
+  "source": "Keep the sidebar open",
+  "plural": false
+ },
+ {
   "source": "Kind",
   "plural": false
  },
  {
-  "source": "List (Ctrl+2); click for columns",
+  "source": "Link → %1",
+  "plural": false
+ },
+ {
+  "source": "List",
+  "plural": false
+ },
+ {
+  "source": "loading…",
   "plural": false
  },
  {
@@ -320,7 +560,15 @@
   "plural": false
  },
  {
-  "source": "Modified",
+  "source": "Mark and advance",
+  "plural": false
+ },
+ {
+  "source": "Mark and move on",
+  "plural": false
+ },
+ {
+  "source": "Mark filtered and show all",
   "plural": false
  },
  {
@@ -328,15 +576,19 @@
   "plural": false
  },
  {
-  "source": "Move between the sidebar and the panes",
+  "source": "Move",
   "plural": false
  },
  {
-  "source": "Move the selection",
+  "source": "Move %1 to:",
   "plural": false
  },
  {
   "source": "Move to the trash",
+  "plural": false
+ },
+ {
+  "source": "Move to…",
   "plural": false
  },
  {
@@ -360,11 +612,27 @@
   "plural": false
  },
  {
+  "source": "Network",
+  "plural": false
+ },
+ {
+  "source": "New file",
+  "plural": false
+ },
+ {
+  "source": "New file.txt",
+  "plural": false
+ },
+ {
   "source": "New folder",
   "plural": false
  },
  {
-  "source": "New Folder",
+  "source": "New tab",
+  "plural": false
+ },
+ {
+  "source": "New tab / close tab",
   "plural": false
  },
  {
@@ -376,7 +644,7 @@
   "plural": false
  },
  {
-  "source": "Newest first (S)",
+  "source": "Next tab / reopen a closed tab",
   "plural": false
  },
  {
@@ -388,15 +656,23 @@
   "plural": false
  },
  {
+  "source": "No selection",
+  "plural": false
+ },
+ {
   "source": "No terminal was found.",
   "plural": false
  },
  {
-  "source": "Nothing selected",
+  "source": "Nothing to paste",
   "plural": false
  },
  {
-  "source": "Nothing to paste",
+  "source": "now",
+  "plural": false
+ },
+ {
+  "source": "of %1",
   "plural": false
  },
  {
@@ -408,10 +684,6 @@
   "plural": false
  },
  {
-  "source": "Oldest first (S)",
-  "plural": false
- },
- {
   "source": "Open",
   "plural": false
  },
@@ -420,11 +692,11 @@
   "plural": false
  },
  {
-  "source": "Open folder",
+  "source": "Open focused item",
   "plural": false
  },
  {
-  "source": "Open Folder",
+  "source": "Open in a new tab",
   "plural": false
  },
  {
@@ -432,19 +704,11 @@
   "plural": false
  },
  {
-  "source": "Open in New Window",
+  "source": "Open in the other pane",
   "plural": false
  },
  {
-  "source": "Open in Split Pane",
-  "plural": false
- },
- {
-  "source": "Open Terminal Here",
-  "plural": false
- },
- {
-  "source": "Open With",
+  "source": "Open with…",
   "plural": false
  },
  {
@@ -456,7 +720,7 @@
   "plural": false
  },
  {
-  "source": "Paste Into Folder",
+  "source": "Paste into folder",
   "plural": false
  },
  {
@@ -468,11 +732,11 @@
   "plural": false
  },
  {
-  "source": "Pin or unpin the folder",
+  "source": "Pin the folder",
   "plural": false
  },
  {
-  "source": "Pinned",
+  "source": "Pin this folder",
   "plural": false
  },
  {
@@ -480,15 +744,19 @@
   "plural": false
  },
  {
-  "source": "Points to",
+  "source": "Pixels",
+  "plural": false
+ },
+ {
+  "source": "Places",
+  "plural": false
+ },
+ {
+  "source": "Preferences",
   "plural": false
  },
  {
   "source": "Preview",
-  "plural": false
- },
- {
-  "source": "Preview the selected file",
   "plural": false
  },
  {
@@ -500,11 +768,19 @@
   "plural": false
  },
  {
+  "source": "Recalculate",
+  "plural": false
+ },
+ {
   "source": "Recents",
   "plural": false
  },
  {
   "source": "Recents can't hold files",
+  "plural": false
+ },
+ {
+  "source": "Redo",
   "plural": false
  },
  {
@@ -520,15 +796,11 @@
   "plural": false
  },
  {
-  "source": "Rename / duplicate",
-  "plural": false
- },
- {
   "source": "Rename it from its folder",
   "plural": false
  },
  {
-  "source": "Rename…",
+  "source": "Reopen closed tab",
   "plural": false
  },
  {
@@ -560,11 +832,27 @@
   "plural": false
  },
  {
+  "source": "Search",
+  "plural": false
+ },
+ {
   "source": "Search %1 and below",
   "plural": false
  },
  {
-  "source": "Search this folder and below",
+  "source": "Search a place…",
+  "plural": false
+ },
+ {
+  "source": "Search and open",
+  "plural": false
+ },
+ {
+  "source": "Search command or shortcut…",
+  "plural": false
+ },
+ {
+  "source": "Search in subfolders",
   "plural": false
  },
  {
@@ -572,15 +860,27 @@
   "plural": false
  },
  {
-  "source": "Select a range",
+  "source": "Select all",
   "plural": false
  },
  {
-  "source": "Select everything",
+  "source": "Select all / invert the selection",
   "plural": false
  },
  {
-  "source": "Select with a rectangle (Alt adds)",
+  "source": "Select an item",
+  "plural": false
+ },
+ {
+  "source": "Selection",
+  "plural": false
+ },
+ {
+  "source": "Send %n items to Trash",
+  "plural": true
+ },
+ {
+  "source": "Send to Trash",
   "plural": false
  },
  {
@@ -596,6 +896,10 @@
   "plural": false
  },
  {
+  "source": "Session and help",
+  "plural": false
+ },
+ {
   "source": "Set Default",
   "plural": false
  },
@@ -608,6 +912,10 @@
   "plural": false
  },
  {
+  "source": "Shortcut help",
+  "plural": false
+ },
+ {
   "source": "Show hidden files",
   "plural": false
  },
@@ -616,15 +924,11 @@
   "plural": false
  },
  {
-  "source": "Show hidden files (Ctrl+H)",
-  "plural": false
- },
- {
-  "source": "Show or hide the details pane",
-  "plural": false
- },
- {
   "source": "Show these shortcuts",
+  "plural": false
+ },
+ {
+  "source": "Show thumbnails of pictures and videos",
   "plural": false
  },
  {
@@ -636,6 +940,10 @@
   "plural": false
  },
  {
+  "source": "Size not calculated",
+  "plural": false
+ },
+ {
   "source": "Skip",
   "plural": false
  },
@@ -644,19 +952,19 @@
   "plural": false
  },
  {
-  "source": "Sort: name, kind, newest, oldest, size",
+  "source": "Sort by…",
   "plural": false
  },
  {
-  "source": "Sorted by kind (S)",
+  "source": "Space",
   "plural": false
  },
  {
-  "source": "Sorted by name (S)",
+  "source": "Space and sizes",
   "plural": false
  },
  {
-  "source": "Split into two panes / close the right one",
+  "source": "Space map",
   "plural": false
  },
  {
@@ -672,15 +980,23 @@
   "plural": false
  },
  {
+  "source": "Tab created",
+  "plural": false
+ },
+ {
   "source": "Taildrop",
   "plural": false
  },
  {
-  "source": "Tailnet",
+  "source": "Templates",
   "plural": false
  },
  {
-  "source": "Templates",
+  "source": "Terminal here",
+  "plural": false
+ },
+ {
+  "source": "Text",
   "plural": false
  },
  {
@@ -708,6 +1024,10 @@
   "plural": false
  },
  {
+  "source": "Theme: System (live)",
+  "plural": false
+ },
+ {
   "source": "There's already a file with this name in %1.",
   "plural": false
  },
@@ -728,11 +1048,27 @@
   "plural": false
  },
  {
+  "source": "Tools",
+  "plural": false
+ },
+ {
+  "source": "Total: %1",
+  "plural": false
+ },
+ {
   "source": "Trash",
   "plural": false
  },
  {
-  "source": "Type a path (Tab completes)",
+  "source": "Type",
+  "plural": false
+ },
+ {
+  "source": "Type to filter: *.pdf, ext:md, type:dir, !draft",
+  "plural": false
+ },
+ {
+  "source": "Undo",
   "plural": false
  },
  {
@@ -752,7 +1088,19 @@
   "plural": false
  },
  {
+  "source": "Up",
+  "plural": false
+ },
+ {
+  "source": "Up to %1 tabs",
+  "plural": false
+ },
+ {
   "source": "User",
+  "plural": false
+ },
+ {
+  "source": "Video",
   "plural": false
  },
  {
@@ -760,11 +1108,39 @@
   "plural": false
  },
  {
+  "source": "View",
+  "plural": false
+ },
+ {
   "source": "Views",
   "plural": false
  },
  {
+  "source": "wheel scrolls",
+  "plural": false
+ },
+ {
+  "source": "Window",
+  "plural": false
+ },
+ {
+  "source": "Window: Fullscreen",
+  "plural": false
+ },
+ {
+  "source": "Window: Normal",
+  "plural": false
+ },
+ {
+  "source": "Without area: %1",
+  "plural": false
+ },
+ {
   "source": "Working",
+  "plural": false
+ },
+ {
+  "source": "yesterday",
   "plural": false
  },
  {
@@ -777,6 +1153,10 @@
  },
  {
   "source": "Zoom in, out, fit",
+  "plural": false
+ },
+ {
+  "source": "↑↓ or wheel · Enter runs · Esc closes",
   "plural": false
  }
 ]
