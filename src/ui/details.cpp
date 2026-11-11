@@ -286,7 +286,7 @@ void DetailsPane::draw() {
         int bx = ix + iw / 2 - 24, by = ty + (ph - 48) / 2;
         fo::paint::round_fill(bx, by, 48, 48, r ? 10 : 0, badge_color(entry_));
         std::string ext = entry_.extension();
-        fo::text::draw(ext.empty() ? "FILE" : ext.substr(0, 5), bx + 2, by, 44, 48, t.background(), fo::text::BOLD, 14,
+        fo::text::draw(ext.empty() ? "FILE" : ext.substr(0, 5), bx + 2, by, 44, 48, t.background(), fo::text::REGULAR, 14,
                        FL_ALIGN_CENTER, fo::text::Elide::None);
     }
     // Name, kind and the facts.

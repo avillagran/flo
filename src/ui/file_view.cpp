@@ -284,7 +284,7 @@ void FileView::draw_badge(const Entry &e, const std::string &path, int x, int y,
         ext = "FILE";
     if (ext.size() > 4)
         ext = ext.substr(0, 4);
-    fo::text::draw(ext, x + 2, y + 2, b, b, t.background(), fo::text::BOLD, 9, FL_ALIGN_CENTER, fo::text::Elide::None);
+    fo::text::draw(ext, x + 2, y + 2, b, b, t.background(), fo::text::REGULAR, 9, FL_ALIGN_CENTER, fo::text::Elide::None);
 }
 
 void FileView::draw_card_item(int i, int X, int Y, int W, int H, const ItemState &s) {
