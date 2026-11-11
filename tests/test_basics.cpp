@@ -123,7 +123,7 @@ TEST(settings_round_trip_keeps_unknown_keys) {
     const std::string d = private_dir("settings");
     const std::string file = d + "/flo/flo.conf";
     Settings defaults = Settings::load(file);
-    CHECK(defaults.view == ViewMode::Grid && defaults.sort == SortMode::Name && !defaults.show_hidden);
+    CHECK(defaults.view == ViewMode::Groups && defaults.sort == SortMode::Name && !defaults.show_hidden);
     ::mkdir((d + "/flo").c_str(), 0700);
     write_file(file, "# mine\n[view]\nmode=list\ncustom=keep\n[other]\nx=1\n");
     Settings s = Settings::load(file);
@@ -146,7 +146,10 @@ TEST(settings_round_trip_keeps_unknown_keys) {
     ini.parse("[window]\nwidth=-5\n[view]\nsort=nope\n");
     Settings b;
     b.read_from(ini);
-    CHECK(b.window_width == 1280 && b.sort == SortMode::Name);
+    CHECK(b.window_width == 1100 && b.sort == SortMode::Name);
+    ViewMode v;
+    CHECK(parse_view_mode("space", v) && v == ViewMode::Space && std::string(view_mode_name(v)) == "space");
+    CHECK(parse_view_mode("groups", v) && v == ViewMode::Groups);
     // The default path honours XDG_CONFIG_HOME (the private one here).
     CHECK(path_inside(Settings::path(), getenv("FLO_TEST_RUN")));
 }

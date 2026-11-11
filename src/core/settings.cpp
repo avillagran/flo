@@ -96,14 +96,18 @@ const char *view_mode_name(ViewMode m) {
     case ViewMode::Grid: return "grid";
     case ViewMode::List: return "list";
     case ViewMode::Columns: return "columns";
+    case ViewMode::Groups: return "groups";
+    case ViewMode::Space: return "space";
     }
-    return "grid";
+    return "groups";
 }
 
 bool parse_view_mode(const std::string &s, ViewMode &out) {
     if (s == "grid") out = ViewMode::Grid;
     else if (s == "list") out = ViewMode::List;
     else if (s == "columns") out = ViewMode::Columns;
+    else if (s == "groups") out = ViewMode::Groups;
+    else if (s == "space") out = ViewMode::Space;
     else return false;
     return true;
 }
@@ -133,6 +137,9 @@ void Settings::read_from(const Ini &ini) {
     parse_sort_mode(ini.get("view", "sort"), sort);
     parse_bool(ini.get("view", "hidden"), show_hidden);
     parse_bool(ini.get("view", "details"), details_pane);
+    parse_bool(ini.get("view", "rail-pinned"), rail_pinned);
+    parse_bool(ini.get("view", "auto-sizes"), auto_sizes);
+    parse_bool(ini.get("view", "thumbnails"), thumbnails);
     parse_int(ini.get("view", "thumbnail-size"), 64, 1024, thumbnail_size);
     parse_int(ini.get("window", "width"), 200, 20000, window_width);
     parse_int(ini.get("window", "height"), 150, 20000, window_height);
@@ -144,6 +151,9 @@ void Settings::write_to(Ini &ini) const {
     ini.set("view", "sort", sort_mode_name(sort));
     ini.set("view", "hidden", show_hidden ? "true" : "false");
     ini.set("view", "details", details_pane ? "true" : "false");
+    ini.set("view", "rail-pinned", rail_pinned ? "true" : "false");
+    ini.set("view", "auto-sizes", auto_sizes ? "true" : "false");
+    ini.set("view", "thumbnails", thumbnails ? "true" : "false");
     ini.set("view", "thumbnail-size", std::to_string(thumbnail_size));
     ini.set("window", "width", std::to_string(window_width));
     ini.set("window", "height", std::to_string(window_height));

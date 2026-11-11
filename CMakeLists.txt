@@ -40,6 +40,7 @@ add_library(flo-core STATIC
   src/core/json.cpp
   src/core/lister.cpp
   src/core/mounter.cpp
+  src/core/name_filter.cpp
   src/core/natural_sort.cpp
   src/core/network.cpp
   src/core/places.cpp
@@ -51,6 +52,7 @@ add_library(flo-core STATIC
   src/core/thumbnail_service.cpp
   src/core/thumbnailers.cpp
   src/core/trash.cpp
+  src/core/tree_size.cpp
   src/core/undo.cpp
   src/core/uri.cpp
   src/core/watcher.cpp

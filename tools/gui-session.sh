@@ -13,6 +13,11 @@
 #   FLO_SESSION_BUS=1         a private dbus-daemon (no services, its socket
 #                             in RUN_DIR/runtime/bus) as the session bus,
 #                             instead of no bus at all.
+#   FLO_SESSION_APP=BINARY    runs BINARY instead of build/flo (read-only
+#                             inside the sandbox), e.g. ~/.local/bin/files
+#                             for side-by-side screenshots with Files.
+#   FLO_SESSION_THEME=FILE    copies an Omarchy colors.toml into the private
+#                             home, so both apps draw the same palette.
 # A RUN_DIR/run-media folder, if the setup makes one, is /run/media inside
 # the sandbox (for mountinfo fixtures of removable drives).
 #
@@ -55,11 +60,18 @@ start)
   magick -size 640x480 gradient:gold-firebrick "$lis/Alfama/tram-28.png"
   printf 'file://%s Lisbon\n' "$(printf '%s' "$lis" | sed 's/ /%20/g')" > "$h/.config/gtk-3.0/bookmarks"
 
+  if [ -n "${FLO_SESSION_THEME:-}" ]; then
+    mkdir -p "$h/.local/state/omarchy/current/theme"
+    cp "$FLO_SESSION_THEME" "$h/.local/state/omarchy/current/theme/colors.toml"
+  fi
+  app=${FLO_SESSION_APP:-$build/flo}
+  app_dir=$(cd "$(dirname "$app")" && pwd -P)
   cat > "$run/env.sh" <<EOF
 export TMPDIR="$run/tmp" HOME="$h" XDG_CONFIG_HOME="$h/.config" XDG_DATA_HOME="$h/.local/share"
 export XDG_CACHE_HOME="$h/.cache" XDG_STATE_HOME="$h/.local/state" XDG_RUNTIME_DIR="$run/runtime"
 export DBUS_SESSION_BUS_ADDRESS="unix:path=$run/runtime/no-bus" GIO_USE_VFS=local GVFS_DISABLE_FUSE=1
 export DISPLAY=":$disp" FLO_TEST_RUN="$run"
+export FILES_CONFIG_DIR="$h/.config/files"
 unset WAYLAND_DISPLAY HYPRLAND_INSTANCE_SIGNATURE OMARCHY_PATH
 EOF
   cat > "$run/sandbox.sh" <<EOF
@@ -69,7 +81,7 @@ EOF
 exec bwrap --unshare-pid --die-with-parent \\
   --ro-bind /usr /usr --symlink usr/lib /lib --symlink usr/lib /lib64 --symlink usr/bin /bin --symlink usr/bin /sbin \\
   --ro-bind /etc /var/etc --symlink var/etc /etc --proc /proc --dev /dev --tmpfs /tmp --bind /tmp/.X11-unix /tmp/.X11-unix \\
-  --ro-bind "$build" "$build" --bind "$run" "$run" --chdir "$h" "\$@"
+  --ro-bind "$build" "$build" --ro-bind "$app_dir" "$app_dir" --bind "$run" "$run" --chdir "$h" "\$@"
 EOF
   chmod 0700 "$run/sandbox.sh"
   if [ "${FLO_SESSION_BUS:-}" = 1 ]; then
@@ -96,7 +108,7 @@ EOF
   sleep 1
   # bwrap dies with its parent: a waiting shell keeps it alive past this
   # script, and stopping that shell stops the sandbox.
-  sh -c '"$1/sandbox.sh" "$2" "$3"; true' sh "$run" "$build/flo" "${3:-$h}" > "$run/flo.log" 2>&1 &
+  sh -c '"$1/sandbox.sh" "$2" "$3"; true' sh "$run" "$app" "${3:-$h}" > "$run/flo.log" 2>&1 &
   echo $! > "$run/flo.pid"
   sleep 1.5
   echo "$run"

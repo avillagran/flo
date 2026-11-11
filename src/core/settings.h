@@ -29,16 +29,20 @@ private:
     std::vector<Line> lines_;
 };
 
-enum class ViewMode { Grid, List, Columns };
+// Files' views: Groups (Ctrl+1), List (2), Columns (3), Space (4), Grid (5).
+enum class ViewMode { Grid, List, Columns, Groups, Space };
 const char *view_mode_name(ViewMode m);
 bool parse_view_mode(const std::string &s, ViewMode &out);
 
 struct Settings {
-    ViewMode view = ViewMode::Grid;
+    ViewMode view = ViewMode::Groups; // Files opens in Groups
     SortMode sort = SortMode::Name;
     bool show_hidden = false;
-    bool details_pane = true;
-    int window_width = 1280, window_height = 800; // Folio's first size
+    bool details_pane = true;  // Files' inspector
+    bool rail_pinned = false;  // the rail stays expanded
+    bool auto_sizes = true;    // measure visible folders (Files' default)
+    bool thumbnails = true;    // pictures and videos show their thumbnails
+    int window_width = 1100, window_height = 700; // Files' first size
     bool window_maximized = false;
     int thumbnail_size = 256; // requested pixels (Folio: large)
 
