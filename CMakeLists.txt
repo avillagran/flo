@@ -74,8 +74,8 @@ add_executable(flo-thumbnailer src/thumbnailer/main.cpp)
 target_link_libraries(flo-thumbnailer PRIVATE flo-thumbgen)
 
 # ---------------------------------------------------------------------------
-# flo: the application. Today it carries the CLI (src/cli.cpp) and a GUI
-# placeholder; the UI agent replaces the placeholder in src/main.cpp.
+# flo: the application: the CLI (src/cli.cpp), the window and the preview
+# process (src/ui/, when FLO_BUILD_GUI is on).
 # ---------------------------------------------------------------------------
 add_executable(flo src/main.cpp src/cli.cpp)
 target_link_libraries(flo PRIVATE flo-core)
@@ -87,26 +87,24 @@ target_link_libraries(flo PRIVATE flo-core)
 # flo-core and flo-thumbnailer never link FLTK.
 # ===========================================================================
 option(FLO_SHARED_FLTK "Link the flo binary against shared FLTK instead of libfltk.a" OFF)
-option(FLO_BUILD_GUI "Build the FLTK GUI (needs src/ui/ and the toolkit submodule)" OFF)
-if(FLO_SHARED_FLTK)
-  set(FLO_FLTK_TARGETS fltk::images-shared fltk::fltk-shared)
-else()
-  set(FLO_FLTK_TARGETS fltk::images fltk::fltk)
-endif()
+option(FLO_BUILD_GUI "Build the FLTK GUI (src/ui/ and the toolkit submodule)" ON)
 
 # ===========================================================================
-# UI (reserved for the UI work, not part of the core):
-#   - add the toolkit submodule here:
-#       add_subdirectory(third_party/lib-fltk-omarchy)
-#   - add the GUI sources from src/ui/ to the `flo` target.
-# flo-core must keep building without any of this.
+# The GUI: src/ui/ on top of the lib-fltk-omarchy toolkit (a submodule in
+# third_party/). flo-core keeps building without any of this.
 # ===========================================================================
 if(FLO_BUILD_GUI)
   find_package(FLTK 1.4 CONFIG REQUIRED)
-  # add_subdirectory(third_party/lib-fltk-omarchy)
+  if(NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/third_party/lib-fltk-omarchy/CMakeLists.txt)
+    message(FATAL_ERROR "The toolkit submodule is missing: git submodule update --init")
+  endif()
+  set(FO_BUILD_EXAMPLES OFF CACHE BOOL "" FORCE)
+  set(FO_BUILD_TESTS OFF CACHE BOOL "" FORCE)
+  set(FLTK_OMARCHY_SHARED_FLTK ${FLO_SHARED_FLTK} CACHE BOOL "" FORCE)
+  add_subdirectory(third_party/lib-fltk-omarchy EXCLUDE_FROM_ALL)
   file(GLOB FLO_UI_SOURCES CONFIGURE_DEPENDS src/ui/*.cpp)
   target_sources(flo PRIVATE ${FLO_UI_SOURCES})
-  target_link_libraries(flo PRIVATE ${FLO_FLTK_TARGETS})
+  target_link_libraries(flo PRIVATE fltk-omarchy::fltk-omarchy)
   target_compile_definitions(flo PRIVATE FLO_HAVE_GUI=1)
 endif()
 

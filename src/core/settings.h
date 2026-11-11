@@ -38,7 +38,7 @@ struct Settings {
     SortMode sort = SortMode::Name;
     bool show_hidden = false;
     bool details_pane = true;
-    int window_width = 1100, window_height = 720;
+    int window_width = 1280, window_height = 800; // Folio's first size
     bool window_maximized = false;
     int thumbnail_size = 256; // requested pixels (Folio: large)
 

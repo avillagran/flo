@@ -146,7 +146,7 @@ TEST(settings_round_trip_keeps_unknown_keys) {
     ini.parse("[window]\nwidth=-5\n[view]\nsort=nope\n");
     Settings b;
     b.read_from(ini);
-    CHECK(b.window_width == 1100 && b.sort == SortMode::Name);
+    CHECK(b.window_width == 1280 && b.sort == SortMode::Name);
     // The default path honours XDG_CONFIG_HOME (the private one here).
     CHECK(path_inside(Settings::path(), getenv("FLO_TEST_RUN")));
 }
