@@ -39,7 +39,7 @@ constexpr const char *kRecents = "recent://";
 // The last path component of an entry's name (search results and Recents
 // carry longer names).
 std::string display_name(const Entry &e);
-// Icon (fltk-omarchy names) and color for an entry's kind, Folio's palette.
+// Icon (fltk-omarchy names) and color for an entry's kind.
 std::string kind_icon(const Entry &e);
 fo::Rgb kind_color(const Entry &e);
 // "28.0 KB" for files, "3 items" for folders (nothing while uncounted).

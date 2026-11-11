@@ -2,100 +2,126 @@
 
 **F**ile manager, **L**ight, l**O**w memory.
 
-Flo is a lightweight file manager for Omarchy. It follows the patterns and
-standards of [Folio](https://github.com/omacom/folio), Omarchy's own file
-manager: the same keys, the same shared thumbnail cache, GTK bookmarks and
-recent files, the freedesktop trash, and nothing running in the background.
-Flo's goal is to do that with as little memory as possible, using
-[FLTK](https://www.fltk.org) instead of Qt Quick.
+Flo is the C++ successor of **Files**
+([avillagran/files-rust](https://github.com/avillagran/files-rust)), the
+Rust file manager for Omarchy, and keeps Files' identity: its window
+(header with path chips and compact view buttons, tab strip, 52 px rail,
+inspector, status bar), its views (Groups, List, Grid, Columns and the Space
+treemap), its keys and its wording. Flo rebuilds it in plain C++17 on
+[FLTK](https://www.fltk.org) 1.4 to start fast, stay small and build in
+seconds.
+
+![Files (left) and Flo (right) in the same folder](docs/screenshots/files-vs-flo/groups.png)
 
 ## From Rust to C++
 
-Flo is the C++ rewrite of
-[avillagran/files-rust](https://github.com/avillagran/files-rust), the
-original project, a Rust file manager built on fltk-rs. The Rust version
-proved that a full file manager fits in about 19 MiB, but each Rust project
-carried gigabytes of build output and long release builds. Flo keeps the
-goal and drops the weight: plain C++17 on FLTK 1.4, built with CMake into a
-build folder of a few megabytes.
+Files proved that a full file manager fits in about 19 MiB, but each Rust
+project carried gigabytes of build output and long release builds. Flo
+keeps the app and drops the weight: CMake, a build folder of a few
+megabytes, FLTK linked statically.
 
 Its toolkit moved the same way:
 [avillagran/lib-fltk-omarchy](https://github.com/avillagran/lib-fltk-omarchy)
 (C++), from
-[lib-fltk-omarchy-rust](https://github.com/avillagran/lib-fltk-omarchy-rust).
+[lib-fltk-omarchy-rust](https://github.com/avillagran/lib-fltk-omarchy-rust),
+whose look (Files' look) it carries.
+
+For desktop standards and plumbing (the freedesktop thumbnail cache and
+trash, GTK bookmarks, Recents, `org.freedesktop.FileManager1`, GVfs/SFTP and
+the tailnet, MTP) Flo follows Omarchy's
+[Folio](https://github.com/omacom/folio). Folio is a technical reference
+only: look, layout, keys and wording are Files'.
 
 ## Status
 
-Usable. The window covers Folio's everyday behavior; see
-[docs/FOLIO-PARITY.md](docs/FOLIO-PARITY.md) for what is still missing.
+Usable, with Files' everyday features; see
+[docs/FILES-PARITY.md](docs/FILES-PARITY.md) for what is done, what comes
+next and what is left out of this phase.
 
 - **Window** (`src/ui/`, on the
   [lib-fltk-omarchy](https://github.com/avillagran/lib-fltk-omarchy)
-  toolkit): sidebar (home folders, pins from GTK bookmarks, Recents, Trash,
-  drives with eject, tailnet machines), breadcrumbs, grid (256 px
-  thumbnails), list and columns views (Ctrl+1/2/3), details pane (Ctrl+I),
-  split view (Ctrl+Alt+N, Ctrl+W), path entry with Tab completion (Ctrl+L),
-  `/` search, context menu (right click, Alt+Enter, Menu), drag and drop,
-  the SFTP password prompt in the window, file operations with progress and
-  conflict prompts, undo/redo toasts, `?` shortcuts overlay, and Folio's keys.
-  The live Omarchy theme and the toolkit's motion apply throughout.
+  toolkit): Files' header (back/forward/up, path chips, Search, Edit path,
+  Groups, List, Grid, Space, Columns, Inspector, Actions, Preferences; a
+  label on hover, the shortcut after a rest), tabs (Ctrl+T, Ctrl+W,
+  Ctrl+Shift+T, Ctrl+Tab), the expandable rail (pinned folders, Recents,
+  home folders, drives with eject, tailnet machines, the trash), the views
+  (Ctrl+1 Groups, 2 List, 3 Columns, 4 Space, 5 Grid), the inspector
+  (Ctrl+Alt+I) with automatic folder sizes (Ctrl+Space recalculates), the
+  status bar with live PSS, type-to-filter (`*.pdf`, `ext:md`, `type:dir`,
+  `!draft`), the omnibar (Ctrl+L: a path, `>command` or `:place`), the
+  commands palette (Ctrl+Shift+P), recursive search (Ctrl+Shift+F), the dual
+  pane (F9, F5/F6 to the other pane), Actions (F10) and Preferences
+  (Ctrl+,) menus, the context menu, Insert / Ctrl+I / Ctrl+Shift+A
+  selection tools, F2 rename, F7 new folder, Ctrl+N new file, drag and
+  drop, the SFTP password prompt, file operations with progress, conflict
+  prompts and undo, and F1 for every shortcut. The live Omarchy theme and
+  font (a Nerd Font for the glyph icons) apply throughout.
 - **Preview** (Space) runs as its own process, `flo preview PATH`, so
   decoding a large picture never grows the main window.
-- **flo-core** (`src/core/`, no FLTK): folder listing off the UI thread with
-  Folio's sort modes and natural order, live reload, `/` search, the shared
+- **flo-core** (`src/core/`, no FLTK): folder listing off the UI thread
+  with natural order, live reload, Files' name filter, folder sizes without
+  following links, search (plocate, then a live walk), the shared
   freedesktop thumbnail cache with sandboxed `flo-thumbnailer` workers, file
   operations that never overwrite (copy, move, paste, duplicate, rename, new
   folder, compress, extract) with undo and redo, the freedesktop trash,
-  GNOME/KDE clipboard formats, places (home folders, GTK bookmarks, Recents,
-  drives with mount/unmount/eject), tailnet machines over SFTP and Dropbox
-  status, `org.freedesktop.FileManager1`, and settings.
+  GNOME/KDE clipboard formats, places (home folders, GTK bookmarks,
+  Recents, drives), tailnet machines over SFTP, Dropbox status,
+  `org.freedesktop.FileManager1`, and settings.
 - **CLI** for scripts and agents, no display needed:
   `flo list|info|thumbnail|trash|restore [--json] PATH`.
 
 See [docs/CORE.md](docs/CORE.md), [docs/THUMBNAILS.md](docs/THUMBNAILS.md)
-and [docs/FOLIO-PARITY.md](docs/FOLIO-PARITY.md).
+and [docs/FILES-PARITY.md](docs/FILES-PARITY.md).
 
-| Grid | Columns |
+Files (left) and Flo (right), from
+[docs/screenshots/files-vs-flo/](docs/screenshots/files-vs-flo/):
+
+| | |
 |---|---|
-| ![Grid](docs/screenshots/grid.png) | ![Columns](docs/screenshots/columns.png) |
-| ![List](docs/screenshots/list.png) | ![Split view](docs/screenshots/split.png) |
-| ![Context menu](docs/screenshots/menu.png) | ![Conflict](docs/screenshots/conflict.png) |
+| List | ![List](docs/screenshots/files-vs-flo/list.png) |
+| Grid | ![Grid](docs/screenshots/files-vs-flo/grid.png) |
+| Columns | ![Columns](docs/screenshots/files-vs-flo/columns.png) |
+| Space | ![Space](docs/screenshots/files-vs-flo/space.png) |
+| Dual pane (F9) | ![Dual pane](docs/screenshots/files-vs-flo/dual.png) |
+| Actions (F10) | ![Actions](docs/screenshots/files-vs-flo/actions.png) |
+| Rail | ![Rail](docs/screenshots/files-vs-flo/rail.png) |
 
-More in [docs/screenshots/](docs/screenshots/): search, path entry, rename,
-preview, trash, undo toast, empty folder, shortcuts overlay.
+More of Flo alone in [docs/screenshots/](docs/screenshots/): drives and
+network, the SFTP prompt, rename, conflict, trash, undo, empty folder,
+shortcuts and the preview.
 
 ## Memory
 
-PSS and RSS from `/proc/PID/smaps_rollup` (`tools/measure-mem.sh`), after
-30 seconds idle, release build, FLTK linked statically, in a private Xvfb
-(1280x800 window, X11 backend, no session bus), with a folder of 50 photos
-(1600x1200 JPEG) open in the grid with the details pane. Measured
-2026-11-11 with folder peeks, remembered listings and all 50 translation
-catalogs in the binary:
+PSS and RSS from `/proc/PID/smaps_rollup` (`tools/measure-mem.sh`), release
+build, FLTK linked statically, in a private Xvfb (1100x700 window, X11
+backend, no session bus), Tokyo Night, with the fixture home of
+`tools/gui-session.sh` (a folder of 50 photos, 1600x1200 JPEG). Measured
+2026-11-11 before (5b0724c, the Folio-look window) and after the Files
+look, in the same session:
 
-| State | flo PSS | flo RSS |
+| State | before | after |
 |---|---|---|
-| Folder open, first screen of thumbnails, cold cache | 16.1 MiB | 31.1 MiB |
-| Same, restarted with a warm thumbnail cache | 15.5 MiB | 30.1 MiB |
-| After scrolling through all 50 thumbnails | 20.7 MiB | 36.1 MiB |
+| Home folder, idle | 13.5 MiB | 14.6 MiB |
+| Photo folder, first screen of thumbnails (Groups after; grid before) | 15.8 MiB | 15.0 MiB |
+| Same folder in the Grid view | — | 16.3 MiB |
+| After the Grid and 30 s idle in Groups | — | 16.6 MiB |
 
-The previous release (eeac41a), measured in the same session for
-comparison, gave 16.2 MiB and 20.7 MiB for the first and third rows (its
-earlier 15.7 and 19.2 MiB were taken on a different day): the new
-features cost about 0.3 to 0.5 MiB, and a fixed malloc mmap threshold
-(decoded thumbnails no longer fragment the heap) wins back about 0.7 MiB.
-Scaled thumbnails are capped at 4 MiB (about 115 tiles), so a bigger
-folder of photos doesn't grow past that.
+Files itself, in the same states and session, shows 19 to 22 MiB in its
+own PSS footer. The new window costs about 1 MiB at rest (the tab strip,
+rail, inspector, status bar and the folder-size worker) and nothing in a
+folder of photos, where the 38 px rows draw smaller thumbnails than the
+old grid. Text uses one face of the Nerd Font: a second (bold) face would
+add about 0.5 MiB. Scaled thumbnails are capped at 4 MiB (about 115
+tiles), so a bigger folder of photos doesn't grow past that.
 
 Reported separately (child processes, gone when idle):
 
 | Process | PSS | RSS |
 |---|---|---|
-| `flo-thumbnailer` worker, while making thumbnails (up to 4; exit after 20 s idle) | ~1.0 MiB each | ~7.9 MiB each |
+| `flo-thumbnailer` worker, while making thumbnails (up to 4; exit after 20 s idle) | ~1.0 MiB each | ~7.7 MiB each |
 | `flo preview` showing a 1600x1200 photo (exits when closed) | 23.7 MiB | 40.5 MiB |
 
-For reference: the Rust predecessor measured 19 MiB, a bare FLTK window
-about 9 MiB.
+For reference: a bare FLTK window is about 9 MiB.
 
 ## Building
 
@@ -128,7 +154,12 @@ with fixture data (a home with 50 photos) and prints the run directory;
 `FLO_SESSION_SETUP=tools/session-fixtures.sh` adds a removable drive, an
 SFTP stand-in, fake `tailscale`/`dropbox-cli`/`localsend` that only log,
 and private applications; `FLO_SESSION_BUS=1` gives the session a private
-D-Bus for `org.freedesktop.FileManager1`.
+D-Bus for `org.freedesktop.FileManager1`. `FLO_SESSION_APP` runs another
+binary in the same kind of session (Files, for comparisons) and
+`FLO_SESSION_THEME` copies an Omarchy `colors.toml` in.
+`tools/side-by-side.sh FILES_BINARY COLORS_TOML` takes the Files/Flo pairs
+in `docs/screenshots/files-vs-flo/`, `tools/flo-shots.sh COLORS_TOML` the
+rest.
 
 Tests run in a fresh private directory under `build/test-runs/` with their
 own `HOME`, `TMPDIR` and XDG directories; they never touch your files.

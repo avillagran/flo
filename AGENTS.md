@@ -1,11 +1,22 @@
 # Flo instructions
 
-Flo is a lightweight C++ file manager for Omarchy. Folio
-(github.com/omacom/folio, MIT) is the reference for behavior, keys and
-desktop standards: when in doubt, do what Folio does, unless it costs
-memory. The Rust predecessor (`~/Work/files`, GitHub `files-rust`) is the
-reference for safety rules (undo through the trash, conflict handling,
-sandboxed child processes); never edit it from here.
+Flo is the C++ successor of **Files** (`~/Work/files`, GitHub
+`files-rust`), the Rust file manager for Omarchy, and keeps Files'
+identity: **Flo must be Files.** Files is the reference for the look,
+layout, keys, wording and feature set (its README and `docs/*.md`, its
+screenshots in `docs/evidence/`, the binary at `~/.local/bin/files`, its
+toolkit `~/Work/lib-fltk-omarchy`), and for safety rules (undo through the
+trash, conflict handling, sandboxed child processes). Never edit Files or
+its Rust toolkit from here.
+
+Folio (github.com/omacom/folio, MIT) is a reference only for desktop
+standards and plumbing: freedesktop thumbnails and trash, GTK bookmarks,
+Recents, `org.freedesktop.FileManager1`, GVfs/SFTP and the tailnet, MTP.
+Where Folio and Files differ in look, keys or wording, Files wins.
+
+`docs/FILES-PARITY.md` tracks Files' features in Flo. Compare visually with
+`tools/side-by-side.sh` (Files and Flo in the same states, each in a
+private Xvfb session).
 
 The toolkit is the `lib-fltk-omarchy` submodule in `third_party/`. Change
 it in its own repository, then bump the submodule.
