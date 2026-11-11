@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Flo
+GenericName=File Manager
+Comment=Browse, preview and open your files
+Keywords=folder;file manager;explorer;browse;flo;
+Exec=flo %U
+Icon=flo
+Terminal=false
+Categories=System;FileTools;FileManager;
+MimeType=inode/directory;
+StartupWMClass=flo
