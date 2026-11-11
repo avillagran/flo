@@ -115,7 +115,8 @@ ctest --test-dir build
 To install as a package, `cd packaging && makepkg -si` (desktop entry for
 `inode/directory`, icon, `flo` and `flo-thumbnailer`). The package builds
 cleanly with `BUILDDIR`, `PKGDEST` and `SRCDEST` pointing into `build/`
-(checked 2026-11-11: a 1.4 MiB `flo-0.1.0-1-x86_64.pkg.tar.zst`, FLTK
+(checked 2026-11-11: a 1.5 MiB `flo-0.1.0-1-x86_64.pkg.tar.zst` with all
+translations, FLTK
 linked statically, every library the binaries load covered by `depends`).
 
 ### Checking the window
