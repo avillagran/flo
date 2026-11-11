@@ -33,9 +33,10 @@ void tune_malloc();
 // The sidebar's data, shared by every window.
 struct PlacesData {
     std::string home;
-    std::vector<Place> home_places, pinned, remote, views, drives;
+    std::vector<Place> places; // Files' Places: Home and the XDG user folders
+    std::vector<Place> pinned, remote, views, drives;
     std::vector<TailnetPeer> peers;
-    std::string dropbox; // synced / syncing / stopped / ""
+    std::string dropbox; // synced / syncing / stopped / "" (Share's Dropbox Link)
 };
 
 // `flo preview PATH` as a child process, as Folio does: a crash in a

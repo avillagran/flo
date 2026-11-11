@@ -80,10 +80,11 @@ UI. A CLI or test loops on `queue.wait(ms)` and `queue.dispatch()`.
 - **Clipboard.** Build payloads with `clipboard::gnome_copied_files`,
   `uri_list`, `plain_text`; parse with `parse_any`; then
   `FileOps::paste(paths, folder, cut)`.
-- **Sidebar.** `places::home_places`, `places::pinned(read_bookmarks())`,
+- **Sidebar.** `places::xdg_places` (Files' Places: Home and the XDG user
+  folders), `places::pinned(read_bookmarks())` (Bookmarks),
   `places::remote_bookmarks`, `places::views()`, `Devices::watch()`,
-  `Network::refresh_tailnet/refresh_dropbox` every 15 s while a window is
-  visible (Folio's poll; nothing runs when no window is open).
+  `Network::refresh_tailnet/refresh_dropbox` (Share's Dropbox Link) every
+  15 s while a window is visible (nothing runs when no window is open).
 - **Opening a tailnet machine.** `Mounter::mount(sftp_uri(host),
   network.is_tailnet_host(host), callbacks)`. A password prompt arrives as
   `MountRequest`; answer with `reply_password` (kept by GVfs for the session

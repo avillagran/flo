@@ -1192,7 +1192,7 @@ void Pane::toggle_pin(const std::string &path) {
         places::unpin(target);
         fo::Toast::show(win_, fo::i18n::arg(fo::tr("Unpinned %1"), path_basename(target)), 2);
     } else {
-        std::string problem = places::pin(target, xdg::home());
+        std::string problem = places::pin(target);
         if (!problem.empty()) {
             fo::Toast::show(win_, problem, 3, fo::Toast::Error);
             return;

@@ -108,7 +108,7 @@ std::string place_icon(const std::string &icon) {
     static const std::map<std::string, std::string> m = {
         {"home", "home"},          {"documents", "file-text"}, {"downloads", "download"},
         {"pictures", "image"},     {"music", "music"},         {"videos", "video"},
-        {"desktop", "monitor"},    {"templates", "file-plus"}, {"public", "share-2"},
+        {"desktop", "database"},    {"templates", "file-plus"}, {"public", "share-2"},
         {"dropbox", "cloud"},      {"recent", "clock"},        {"trash", "trash-2"},
         {"drive", "hard-drive"},   {"removable", "usb"},       {"network", "globe"},
         {"omarchy", "settings"},

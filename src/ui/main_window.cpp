@@ -1252,44 +1252,30 @@ std::string MainWindow::place_for(const std::string &folder) const {
     return best;
 }
 
+// The rail's Favorites row opens the favorites hub (Files: Action::Bookmarks).
+static const char *const kFavoritesRow = "favorites:";
+
 void MainWindow::rebuild_sidebar() {
     const PlacesData &pd = App::get().places();
-    const fo::Theme &t = fo::theme();
     int cursor = rail_->cursor();
     rail_->clear();
-    // Files' rail: pinned folders and Recents first, then the places, the
-    // network and drives, and the trash at the bottom.
+    // Files' rail (places_sidebar.rs): Favorites, Recents and Starred,
+    // then Places (Home and the XDG folders), Bookmarks, Devices, Network,
+    // and the trash at the bottom.
     rail_->add_section("");
+    rail_->add_row({fo::tr("Favorites"), "star", kFavoritesRow});
     for (const auto &p : pd.views)
         if (p.icon == "recent")
             rail_->add_row({fo::tr(p.name.c_str()), "recent", p.path});
     rail_->add_row({fo::tr("Starred"), "star-outline", kStarred});
-    for (const auto &p : pd.pinned)
-        rail_->add_row({p.name, "star", p.path});
-    for (const auto &p : pd.remote)
-        rail_->add_row({p.name, "globe", "mount:" + p.uri});
     rail_->add_section(fo::tr("Places"), pd.home);
-    rail_->add_row({fo::tr("Home"), "home", pd.home});
-    // Files' order: Downloads, Documents, Pictures, Music, Videos, then the rest.
-    std::vector<Place> home_places = pd.home_places;
-    auto rank = [](const Place &p) {
-        static const char *order[] = {"downloads", "documents", "pictures", "music", "videos"};
-        for (int k = 0; k < 5; ++k)
-            if (p.icon == order[k])
-                return k;
-        return 5;
-    };
-    std::stable_sort(home_places.begin(), home_places.end(),
-                     [&](const Place &a, const Place &b) { return rank(a) < rank(b); });
-    for (const auto &p : home_places) {
-        fo::SidebarRow r(p.name, place_icon(p.icon), p.path);
-        if (p.icon == "dropbox" && !pd.dropbox.empty() && pd.dropbox != "synced") {
-            r.status = pd.dropbox == "syncing" ? fo::tr("syncing") : fo::tr("stopped");
-            r.status_color = pd.dropbox == "syncing" ? t.yellow() : t.red();
-        }
-        rail_->add_row(r);
-    }
-    int drives = rail_->add_section(fo::tr("Drives"));
+    for (const auto &p : pd.places)
+        rail_->add_row({fo::tr(p.name.c_str()), place_icon(p.icon), p.path});
+    int marks = rail_->add_section(fo::tr("Bookmarks"));
+    for (const auto &p : pd.pinned)
+        rail_->add_row({p.name, "bookmark", p.path});
+    rail_->section_visible(marks, !pd.pinned.empty());
+    int drives = rail_->add_section(fo::tr("Devices"));
     for (const auto &p : pd.drives) {
         fo::SidebarRow r(p.name, place_icon(p.icon), p.mounted && !p.path.empty() ? p.path : "volume:" + p.id);
         r.ejectable = p.mounted && (p.can_eject || p.can_unmount);
@@ -1297,9 +1283,11 @@ void MainWindow::rebuild_sidebar() {
     }
     rail_->section_visible(drives, !pd.drives.empty());
     int net = rail_->add_section(fo::tr("Network"));
+    for (const auto &p : pd.remote)
+        rail_->add_row({p.name, "globe", "mount:" + p.uri});
     for (const auto &p : pd.peers)
         rail_->add_row({p.name, p.os == "linux" ? "server" : "laptop", "tailnet:" + p.host});
-    rail_->section_visible(net, !pd.peers.empty());
+    rail_->section_visible(net, !pd.peers.empty() || !pd.remote.empty());
     for (const auto &p : pd.views)
         if (p.icon == "trash") {
             fo::SidebarRow r(fo::tr(p.name.c_str()), "trash", p.path);
@@ -1315,7 +1303,9 @@ void MainWindow::rebuild_sidebar() {
 void MainWindow::activate_row(const fo::SidebarRow &r) {
     Pane *p = active_pane();
     const std::string &id = r.id;
-    if (id.compare(0, 8, "tailnet:") == 0)
+    if (id == kFavoritesRow)
+        FavoritesHub::open(this, p);
+    else if (id.compare(0, 8, "tailnet:") == 0)
         p->open_peer(id.substr(8));
     else if (id.compare(0, 6, "mount:") == 0)
         p->open_uri(id.substr(6));

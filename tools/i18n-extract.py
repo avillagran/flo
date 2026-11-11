@@ -16,8 +16,8 @@ import re
 root = pathlib.Path(__file__).resolve().parent.parent
 # Strings that reach fo::tr() through a variable.
 DYNAMIC = [
-    # Sidebar places (home folders named by their XDG role, and views).
-    "Home", "Desktop", "Documents", "Downloads", "Music", "Pictures", "Videos", "Templates", "Public",
+    # Sidebar places (Files' XDG places, and views).
+    "Home", "Desktop", "Documents", "Downloads", "Music", "Pictures", "Videos",
     "Recents", "Trash",
     # The sort menu.
     "Name", "Kind", "Newest", "Oldest", "Size",

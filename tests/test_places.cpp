@@ -19,23 +19,37 @@
 using namespace flo;
 using namespace flo_test;
 
-TEST(home_places_with_roles) {
-    const std::string home = xdg::home(); // private in tests
-    CHECK(path_inside(home, std::getenv("FLO_TEST_RUN")));
-    for (const char *n : {"Downloads", "omarchy", "Dropbox", "Work", "Music", "projects 10", "projects 9"})
+// Files' places (places.rs xdg_places): Home and the XDG folders that
+// exist, in Files' order; never the other folders in home.
+TEST(xdg_places_as_files) {
+    const std::string home = private_dir("xdg-home");
+    for (const char *n : {"Downloads", "Musik", "Pictures", "Desktop", "omarchy", "Dropbox", "Work", "Videos"})
         ::mkdir((home + "/" + n).c_str(), 0700);
-    write_file(xdg::config_home() + "/user-dirs.dirs", "XDG_MUSIC_DIR=\"$HOME/Music\"\nXDG_DOWNLOAD_DIR=\"$HOME/Downloads\"\n");
-    auto p = places::home_places(home, "synced");
-    std::string names, icons;
+    const std::string dirs = "# written by xdg-user-dirs-update\n"
+                             "XDG_MUSIC_DIR=\"$HOME/Musik\"\n"
+                             "XDG_DOWNLOAD_DIR=\"$HOME/Downloads\"\n"
+                             "XDG_DESKTOP_DIR=\"$HOME\"\n"     // home itself: skipped
+                             "XDG_VIDEOS_DIR=\"$HOME/Missing\"\n"; // named but absent: skipped
+    auto p = places::xdg_places(home, dirs);
+    std::string names, icons, paths;
     for (auto &x : p) {
         names += x.name + ",";
         icons += x.icon + ",";
+        paths += x.path.substr(home.size()) + ",";
     }
-    CHECK(names.find("Downloads,Dropbox,Music,Omarchy,projects 9,projects 10,Work,") != std::string::npos);
-    CHECK(icons.find("downloads,dropbox,music,folder,folder,folder,folder,") != std::string::npos);
-    for (auto &x : p)
-        if (x.icon == "dropbox")
-            CHECK_EQ(x.status, std::string("synced"));
+    // Documents doesn't exist; Pictures falls back to home/Pictures.
+    CHECK_EQ(names, std::string("Home,Downloads,Pictures,Music,"));
+    CHECK_EQ(icons, std::string("home,downloads,pictures,music,"));
+    CHECK_EQ(paths, std::string(",/Downloads,/Pictures,/Musik,"));
+    // Without user-dirs.dirs every folder falls back to its English name.
+    auto q = places::xdg_places(home, "");
+    names.clear();
+    for (auto &x : q)
+        names += x.name + ",";
+    CHECK_EQ(names, std::string("Home,Downloads,Pictures,Videos,Desktop,"));
+    // The default form reads the private test home and config.
+    CHECK(path_inside(xdg::home(), std::getenv("FLO_TEST_RUN")));
+    CHECK(!places::xdg_places().empty() && places::xdg_places()[0].path == clean_path(xdg::home()));
     auto v = places::views();
     CHECK(v.size() == 2 && v[1].path == xdg::data_home() + "/Trash/files");
 }
@@ -49,15 +63,16 @@ TEST(bookmarks_pin_unpin_keep_remote) {
     write_file(file, "sftp://box/home/u Box\nfile://" + percent_encode_path(d + "/proj x") + " Project\nsmb://nas/share\n");
     auto bm = places::read_bookmarks(file);
     CHECK_EQ(bm.size(), static_cast<std::size_t>(3));
-    auto pinned = places::pinned(bm, "/nonexistent-home");
+    auto pinned = places::pinned(bm);
     CHECK(pinned.size() == 1 && pinned[0].name == "Project" && pinned[0].path == d + "/proj x");
     auto remote = places::remote_bookmarks(bm);
     CHECK(remote.size() == 2 && remote[0].name == "Box" && remote[1].uri == "smb://nas/share");
-    CHECK_EQ(places::pin(d + "/other", "/nonexistent-home", file), std::string());
+    CHECK_EQ(places::pin(d + "/other", file), std::string());
     CHECK(places::is_pinned(d + "/other", file));
-    CHECK_EQ(places::pin(d + "/other", "/nonexistent-home", file), std::string()); // no duplicate
-    CHECK(!places::pin(d + "/missing", "/nonexistent-home", file).empty());
-    CHECK(!places::pin(d + "/other", d, file).empty()); // already under Home
+    CHECK_EQ(places::pin(d + "/other", file), std::string()); // no duplicate
+    CHECK(!places::pin(d + "/missing", file).empty());
+    // Files lists every bookmark under Bookmarks, a folder of home too.
+    CHECK_EQ(places::pinned(places::read_bookmarks(file)).size(), size_t(2));
     CHECK(places::unpin(d + "/proj x", file));
     const std::string text = read_file(file);
     CHECK(text.find("sftp://box/home/u Box") != std::string::npos);

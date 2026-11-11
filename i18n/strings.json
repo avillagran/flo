@@ -228,6 +228,10 @@
   "plural": false
  },
  {
+  "source": "Bookmarks",
+  "plural": false
+ },
+ {
   "source": "Calculate",
   "plural": false
  },
@@ -508,6 +512,10 @@
   "plural": false
  },
  {
+  "source": "Devices",
+  "plural": false
+ },
+ {
   "source": "Dismiss",
   "plural": false
  },
@@ -529,10 +537,6 @@
  },
  {
   "source": "Downloads",
-  "plural": false
- },
- {
-  "source": "Drives",
   "plural": false
  },
  {
@@ -645,6 +649,10 @@
  },
  {
   "source": "Favorite removed; the folder is untouched",
+  "plural": false
+ },
+ {
+  "source": "Favorites",
   "plural": false
  },
  {
@@ -1240,10 +1248,6 @@
   "plural": false
  },
  {
-  "source": "Public",
-  "plural": false
- },
- {
   "source": "Raw target (not opened): %1",
   "plural": false
  },
@@ -1580,10 +1584,6 @@
   "plural": false
  },
  {
-  "source": "stopped",
-  "plural": false
- },
- {
   "source": "Subfolders not watched · not a snapshot",
   "plural": false
  },
@@ -1593,10 +1593,6 @@
  },
  {
   "source": "Symbolic link (not followed)",
-  "plural": false
- },
- {
-  "source": "syncing",
   "plural": false
  },
  {
@@ -1617,10 +1613,6 @@
  },
  {
   "source": "Taildrop",
-  "plural": false
- },
- {
-  "source": "Templates",
   "plural": false
  },
  {

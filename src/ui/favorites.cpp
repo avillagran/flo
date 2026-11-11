@@ -65,18 +65,10 @@ void FavoritesHub::reload() {
     all_.clear();
     for (const auto &b : places::read_bookmarks())
         if (!b.path.empty())
-            all_.push_back({b.label.empty() ? places::display_name(path_basename(b.path)) : b.label, b.path, 0});
-    // Files: up to eight XDG places.
-    const PlacesData &pd = App::get().places();
-    all_.push_back({fo::tr("Home"), pd.home, 1});
-    for (const auto &p : pd.home_places) {
-        static const char *xdg_icons[] = {"desktop", "documents", "downloads", "music", "pictures", "videos",
-                                          "templates", "public"};
-        bool is_xdg = std::find_if(std::begin(xdg_icons), std::end(xdg_icons),
-                                   [&](const char *i) { return p.icon == i; }) != std::end(xdg_icons);
-        if (is_xdg && std::count_if(all_.begin(), all_.end(), [](const Row &r) { return r.kind == 1; }) < 8)
-            all_.push_back({p.name, p.path, 1});
-    }
+            all_.push_back({b.label.empty() ? path_basename(b.path) : b.label, b.path, 0});
+    // Files: the XDG places (Home first).
+    for (const auto &p : App::get().places().places)
+        all_.push_back({fo::tr(p.name.c_str()), p.path, 1});
     const auto &back = pane_->history_back();
     for (auto it = back.rbegin(); it != back.rend(); ++it)
         if (!is_virtual_folder(*it))
@@ -144,7 +136,7 @@ void FavoritesHub::add_current() {
         notice(fo::tr("The folder is already a favorite"));
         return;
     }
-    std::string why = places::pin(here, xdg::home());
+    std::string why = places::pin(here);
     if (!why.empty()) {
         notice(fo::tr(why.c_str()), true);
         return;

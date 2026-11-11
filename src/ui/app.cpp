@@ -181,9 +181,9 @@ void App::trim_soon() {
 
 void App::refresh_places() {
     places_.home = xdg::home();
-    places_.home_places = places::home_places(places_.home, places_.dropbox);
+    places_.places = places::xdg_places();
     auto bookmarks = places::read_bookmarks();
-    places_.pinned = places::pinned(bookmarks, places_.home);
+    places_.pinned = places::pinned(bookmarks);
     places_.remote = places::remote_bookmarks(bookmarks);
     places_.views = places::views();
     if (!devices_started_)
@@ -201,7 +201,8 @@ void App::start_network_poll() {
     network_tick(this);
 }
 
-// Folio refreshes the tailnet and Dropbox every 15 s while a window is open;
+// The tailnet and Dropbox's state (for Share) are refreshed every 15 s
+// while a window is open;
 // nothing runs when no window is.
 void App::network_tick(void *data) {
     auto *app = static_cast<App *>(data);
@@ -217,12 +218,7 @@ void App::network_tick(void *data) {
         if (!same)
             app->places_changed();
     });
-    app->network_->refresh_dropbox([app](std::string status) {
-        if (status == app->places_.dropbox)
-            return;
-        app->places_.dropbox = status;
-        app->refresh_places();
-    });
+    app->network_->refresh_dropbox([app](std::string status) { app->places_.dropbox = std::move(status); });
     Fl::add_timeout(15.0, network_tick, app);
 }
 

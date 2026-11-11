@@ -1,8 +1,8 @@
-// The sidebar's places, as Folio lists them: Home (every visible folder in
-// home, XDG folders and Dropbox with their own glyphs, `omarchy` shown as
-// "Omarchy"), Pinned (GTK bookmarks), Views (Recents, Trash) and Drives
-// (removable and extra internal disks, not the system's own), plus
-// mount / unmount / eject through GIO.
+// The sidebar's places, as Files lists them (places.rs, places_sidebar.rs):
+// Places (Home and the XDG user folders that exist), Bookmarks (GTK
+// bookmarks), Views (Recents, Trash) and Drives (removable and extra
+// internal disks, not the system's own), plus mount / unmount / eject
+// through GIO.
 #pragma once
 
 #include "core/event_queue.h"
@@ -20,9 +20,7 @@ struct Place {
     std::string path;   // local path ("recent://" for Recents); empty when not mounted
     std::string uri;    // remote bookmarks and unmounted volumes
     std::string icon;   // home documents downloads pictures music videos desktop
-                        // templates public dropbox folder recent trash drive
-                        // removable network
-    std::string status; // Dropbox: synced / syncing / stopped
+                        // folder recent trash drive removable network
     std::string id;     // volumes: identifier for Devices::mount()
     bool removable = false;
     bool mounted = true;
@@ -31,12 +29,17 @@ struct Place {
 
 namespace places {
 
-// Home's visible folders, natural order. `dropbox_status` labels ~/Dropbox.
-std::vector<Place> home_places(const std::string &home, const std::string &dropbox_status = {});
+// Files' places (places.rs xdg_places): Home, then the XDG user folders in
+// Files' order (Downloads, Documents, Pictures, Music, Videos, Desktop),
+// each only when it is an existing folder other than home. `user_dirs` is
+// the text of user-dirs.dirs; a folder it doesn't name falls back to
+// home/<English name>. Names are the English source strings ("Home",
+// "Downloads", ...), translated where they are shown.
+std::vector<Place> xdg_places(const std::string &home, const std::string &user_dirs);
+// The same for xdg::home() and $XDG_CONFIG_HOME/user-dirs.dirs.
+std::vector<Place> xdg_places();
 // Recents and Trash.
 std::vector<Place> views();
-// Folio's display name for a folder ("omarchy" -> "Omarchy").
-std::string display_name(const std::string &folder_name);
 
 // GTK bookmarks: "URI[ label]" lines in $XDG_CONFIG_HOME/gtk-3.0/bookmarks.
 struct Bookmark {
@@ -46,14 +49,15 @@ struct Bookmark {
 std::string bookmarks_path();
 std::vector<Bookmark> parse_bookmarks(const std::string &text);
 std::vector<Bookmark> read_bookmarks(const std::string &file = bookmarks_path());
-// Pinned folders: local, existing, not already under Home, no duplicates.
-std::vector<Place> pinned(const std::vector<Bookmark> &bookmarks, const std::string &home);
+// Files' Bookmarks section: local, existing folders, no duplicates, in the
+// file's order (a place may be bookmarked too, as in Files).
+std::vector<Place> pinned(const std::vector<Bookmark> &bookmarks);
 // Remote bookmarks (sftp://, smb://, ...), kept for GTK and listed.
 std::vector<Place> remote_bookmarks(const std::vector<Bookmark> &bookmarks);
 bool is_pinned(const std::string &path, const std::string &file = bookmarks_path());
 // Adds a folder (written atomically; other lines, remote ones included, are
 // kept as they were). Returns "" or a sentence saying why not.
-std::string pin(const std::string &path, const std::string &home, const std::string &file = bookmarks_path());
+std::string pin(const std::string &path, const std::string &file = bookmarks_path());
 bool unpin(const std::string &path, const std::string &file = bookmarks_path());
 // Files' favorite labels: sets the GTK label of a local bookmark ("" goes
 // back to the folder's name). The folder itself is never renamed. Returns

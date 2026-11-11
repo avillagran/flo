@@ -2,13 +2,11 @@
 #include "core/network.h"
 #include "core/fsutil.h"
 #include "core/gmain_thread.h"
-#include "core/natural_sort.h"
 #include "core/trash.h"
 #include "core/uri.h"
 #include "core/xdg.h"
 
 #include <algorithm>
-#include <map>
 #include <mutex>
 #include <set>
 #include <sstream>
@@ -21,47 +19,41 @@
 namespace flo {
 namespace places {
 
-std::string display_name(const std::string &folder_name) {
-    return folder_name == "omarchy" ? std::string("Omarchy") : folder_name;
-}
-
-std::vector<Place> home_places(const std::string &home, const std::string &dropbox_status) {
-    // The XDG folders keep their own glyphs, wherever user-dirs points.
-    std::map<std::string, std::string> icons;
-    static const std::pair<const char *, const char *> roles[] = {
-        {"DOCUMENTS", "documents"}, {"DOWNLOAD", "downloads"}, {"PICTURES", "pictures"}, {"MUSIC", "music"},
-        {"VIDEOS", "videos"},       {"DESKTOP", "desktop"},     {"TEMPLATES", "templates"}, {"PUBLICSHARE", "public"}};
-    for (const auto &r : roles) {
-        const std::string dir = xdg::user_dir(r.first);
-        if (!dir.empty())
-            icons[clean_path(dir)] = r.second;
-    }
-    icons[clean_path(home + "/Dropbox")] = "dropbox";
-
-    std::vector<std::string> names;
-    if (DIR *d = ::opendir(home.c_str())) {
-        while (dirent *e = ::readdir(d)) {
-            const std::string n = e->d_name;
-            if (n.empty() || n[0] == '.')
-                continue;
-            if (is_dir(path_join(home, n)))
-                names.push_back(n);
-        }
-        ::closedir(d);
-    }
-    std::sort(names.begin(), names.end(), natural_less);
+std::vector<Place> xdg_places(const std::string &home, const std::string &user_dirs) {
+    const std::string h = clean_path(home);
     std::vector<Place> out;
-    for (const auto &n : names) {
+    Place home_place;
+    home_place.name = "Home";
+    home_place.path = h;
+    home_place.icon = "home";
+    out.push_back(home_place);
+    const auto named = xdg::parse_user_dirs(user_dirs, h);
+    static const struct {
+        const char *key, *name, *fallback, *icon;
+    } roles[] = {{"DOWNLOAD", "Downloads", "Downloads", "downloads"}, {"DOCUMENTS", "Documents", "Documents", "documents"},
+                 {"PICTURES", "Pictures", "Pictures", "pictures"},    {"MUSIC", "Music", "Music", "music"},
+                 {"VIDEOS", "Videos", "Videos", "videos"},            {"DESKTOP", "Desktop", "Desktop", "desktop"}};
+    for (const auto &r : roles) {
+        std::string path = path_join(h, r.fallback);
+        for (const auto &kv : named)
+            if (kv.first == r.key)
+                path = kv.second;
+        path = clean_path(path);
+        if (path == h || !is_dir(path))
+            continue;
         Place p;
-        p.path = clean_path(path_join(home, n));
-        p.name = display_name(n);
-        auto it = icons.find(p.path);
-        p.icon = it == icons.end() ? "folder" : it->second;
-        if (p.icon == "dropbox")
-            p.status = dropbox_status;
+        p.name = r.name;
+        p.path = path;
+        p.icon = r.icon;
         out.push_back(std::move(p));
     }
     return out;
+}
+
+std::vector<Place> xdg_places() {
+    std::string text;
+    read_file_capped(xdg::config_home() + "/user-dirs.dirs", 64 * 1024, text);
+    return xdg_places(xdg::home(), text);
 }
 
 std::vector<Place> views() {
@@ -109,22 +101,15 @@ std::vector<Bookmark> read_bookmarks(const std::string &file) {
     return parse_bookmarks(text);
 }
 
-// Home's own visible folders (and home itself) are already under Home.
-static bool listed_under_home(const std::string &path, const std::string &home) {
-    const std::string h = clean_path(home);
-    const std::string base = path_basename(path);
-    return path == h || (path_dirname(path) == h && !base.empty() && base[0] != '.');
-}
-
-std::vector<Place> pinned(const std::vector<Bookmark> &bookmarks, const std::string &home) {
+std::vector<Place> pinned(const std::vector<Bookmark> &bookmarks) {
     std::vector<Place> out;
     std::set<std::string> seen;
     for (const auto &b : bookmarks) {
-        if (b.path.empty() || listed_under_home(b.path, home) || !seen.insert(b.path).second || !is_dir(b.path))
+        if (b.path.empty() || !seen.insert(b.path).second || !is_dir(b.path))
             continue;
         Place p;
         p.path = b.path;
-        p.name = b.label.empty() ? display_name(path_basename(b.path)) : b.label;
+        p.name = b.label.empty() ? path_basename(b.path) : b.label;
         p.icon = "folder";
         out.push_back(std::move(p));
     }
@@ -174,12 +159,10 @@ static std::vector<std::string> raw_lines(const std::string &file) {
     return lines;
 }
 
-std::string pin(const std::string &path, const std::string &home, const std::string &file) {
+std::string pin(const std::string &path, const std::string &file) {
     const std::string clean = clean_path(absolute_path(path));
     if (!is_dir(clean))
         return "Only folders can be pinned.";
-    if (listed_under_home(clean, home))
-        return display_name(path_basename(clean)) + " is already under Home.";
     if (is_pinned(clean, file))
         return {};
     auto lines = raw_lines(file);
@@ -232,7 +215,7 @@ std::string relabel(const std::string &path, const std::string &label, const std
 }
 
 std::string default_label(const std::string &path) {
-    std::string name = display_name(path_basename(clean_path(path)));
+    std::string name = path_basename(clean_path(path));
     for (auto &c : name)
         if (static_cast<unsigned char>(c) < 0x20 || c == 0x7f)
             c = '?';

@@ -64,7 +64,7 @@ next and what is left out of this phase.
   freedesktop thumbnail cache with sandboxed `flo-thumbnailer` workers, file
   operations that never overwrite (copy, move, paste, duplicate, rename, new
   folder, compress, extract) with undo and redo, the freedesktop trash,
-  GNOME/KDE clipboard formats, places (home folders, GTK bookmarks,
+  GNOME/KDE clipboard formats, places (Home and the XDG folders, GTK bookmarks,
   Recents, drives), tailnet machines over SFTP, Dropbox status,
   `org.freedesktop.FileManager1`, and settings.
 - **CLI** for scripts and agents, no display needed:
