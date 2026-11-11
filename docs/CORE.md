@@ -39,7 +39,7 @@ UI. A CLI or test loops on `queue.wait(ms)` and `queue.dispatch()`.
 | `natural_sort.h` | `natural_compare`, `fold_case` | Case-insensitive natural order ("file2" < "file10") |
 | `lister.h` | `Lister`, `Listing`, `list_folder`, `count_items` | Off-thread listing with snapshots for slow folders, lazy folder item counts |
 | `watcher.h` | `Watcher` | inotify live reload, debounced (250 ms), folder or single file (recently-used.xbel) |
-| `search.h` | `Searcher`, `search_walk` | `/` search: breadth-first, same filesystem, no symlinked folders, streamed, cancellable |
+| `search.h` | `Searcher`, `search_locate`, `search_walk` | `/` search: plocate's matches first when it has a database, then a breadth-first walk for the rest; same filesystem, no symlinked folders, streamed, cancellable |
 | `thumbnail_cache.h` | `ThumbnailCache`, `read_png_meta`, `thumbnail_matches` | The shared freedesktop cache read as untrusted input |
 | `thumbnailers.h` | `ThumbnailerRegistry`, `expand_thumbnailer_exec` | Installed `.thumbnailer` entries |
 | `thumbnail_service.h` | `ThumbnailService`, `ThumbnailResult` | Thumbnails for the UI via `flo-thumbnailer` worker processes |

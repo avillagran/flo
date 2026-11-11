@@ -39,7 +39,7 @@ tracks each Folio feature in Flo: the core piece (flo-core) and the window
 | SFTP over GIO landing in the matching home folder | Done (`Mounter`) |
 | Host keys auto-accepted for tailnet peers only, password asked in the window | Done (questions for other hosts go to the UI too) |
 | `/` search: breadth first, same drive, no symlinked folders | Done (`Searcher`), streamed |
-| Search with plocate | Not yet (Folio plan phase 2) |
+| Search with plocate | Done (Folio plan phase 2; Folio's code still walks only): when `plocate` is installed and its database answers, its matches below the folder come first (one scoped, case-insensitive `--regex` query, checked against the disk: gone, hidden, other filesystem or under a symlinked folder are left out; nearest first), then the live walk adds what the database doesn't know yet, without repeats. No plocate or no database: the walk alone, as before. Tested against the real `plocate` with a private `updatedb -o` database |
 | Views remembered (grid/list/columns), details pane, window size | Done (`Settings`, `~/.config/flo/flo.conf`) |
 | `org.freedesktop.FileManager1` | Done (`DBusService`); the window handles ShowFolders/ShowItems |
 | `folio <file>` opens its folder with the file selected | Done in `main.cpp` (forwarded to a running Flo) |

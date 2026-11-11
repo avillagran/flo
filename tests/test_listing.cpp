@@ -4,11 +4,15 @@
 #include "core/event_queue.h"
 #include "core/fsutil.h"
 #include "core/lister.h"
+#include "core/process.h"
+#include "core/xdg.h"
 #include "core/search.h"
 #include "core/watcher.h"
 
 #include <chrono>
 #include <cstdio>
+#include <cstdlib>
+#include <unordered_set>
 #include <set>
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -166,6 +170,89 @@ TEST(listing_cache_is_bounded_and_moves) {
     CHECK(!same_listing(x, y));
     y.pop_back();
     CHECK(!same_listing(x, y));
+}
+
+TEST(search_uses_plocate_then_walks_for_the_rest) {
+    if (flo::xdg::find_program("plocate").empty() || flo::xdg::find_program("updatedb").empty()) {
+        std::printf("     (plocate not installed: skipped)\n");
+        return;
+    }
+    const std::string top = private_dir("locate");
+    const std::string root = top + "/root";
+    ::mkdir(root.c_str(), 0700);
+    ::mkdir((root + "/a").c_str(), 0700);
+    ::mkdir((root + "/a/b").c_str(), 0700);
+    ::mkdir((root + "/.hid").c_str(), 0700);
+    write_file(root + "/a/b/Holiday.JPG", "x");
+    write_file(root + "/hol.txt", "x");
+    write_file(root + "/.hid/hol2.txt", "x");
+    write_file(root + "/a/holder", "x");
+    write_file(top + "/holiday-outside.txt", "x"); // beside the folder searched, not in it
+    CHECK(::symlink("a", (root + "/linked").c_str()) == 0); // inside the fixture
+    // A private database of the fixture only (never the system's).
+    const std::string db = top + "/plocate.db";
+    ProcessResult u = run_process({"updatedb", "-l", "0", "--prune-bind-mounts", "no", "-U", top, "-o", db});
+    CHECK(u.ok());
+    // After the database was made: one file renamed away, one new file.
+    CHECK(::rename((root + "/hol.txt").c_str(), (root + "/renamed.dat").c_str()) == 0);
+    write_file(root + "/a/new-holiday.png", "x");
+
+    SearchOptions o;
+    o.locate_db = db;
+    std::vector<Entry> got;
+    std::unordered_set<std::string> found;
+    CHECK(search_locate(root, "HOL", o, nullptr, got, found));
+    std::vector<std::string> names;
+    for (const auto &e : got)
+        names.push_back(e.name);
+    // Nearest first; the renamed file, the hidden one, the new one (not in
+    // the database yet) and the one beside the folder are left out.
+    CHECK_EQ(names.size(), std::size_t(2));
+    CHECK(names.size() == 2 && names[0] == "a/holder" && names[1] == "a/b/Holiday.JPG");
+    CHECK(found.count("a/holder") == 1);
+    o.show_hidden = true;
+    got.clear();
+    found.clear();
+    CHECK(search_locate(root, "hol", o, nullptr, got, found));
+    CHECK(found.count(".hid/hol2.txt") == 1);
+    // No database: plocate is not used and the walk does it all.
+    SearchOptions none;
+    none.locate_db = top + "/missing.db";
+    got.clear();
+    CHECK(!search_locate(root, "hol", none, nullptr, got, found));
+    none.locate_program = "";
+    CHECK(!search_locate(root, "hol", none, nullptr, got, found));
+
+    // The Searcher: plocate's matches, then the walk's new ones, no repeats.
+    ::setenv("FLO_PLOCATE_DB", db.c_str(), 1);
+    EventQueue q;
+    Searcher searcher(q);
+    std::vector<std::string> all;
+    bool done = false;
+    SearchStats stats;
+    searcher.start(root, "hol", SearchOptions{},
+                   [&](std::vector<Entry> &&b) {
+                       for (auto &e : b)
+                           all.push_back(e.name);
+                   },
+                   [&](const SearchStats &st) {
+                       stats = st;
+                       done = true;
+                   });
+    CHECK(pump_until(q, [&] { return done; }));
+    ::unsetenv("FLO_PLOCATE_DB");
+    std::set<std::string> uniq(all.begin(), all.end());
+    CHECK_EQ(all.size(), uniq.size());
+    CHECK_EQ(stats.located, std::size_t(2));
+    CHECK_EQ(stats.matches, std::size_t(3));
+    CHECK(uniq.count("a/new-holiday.png") == 1 && uniq.count("a/holder") == 1 && uniq.count("a/b/Holiday.JPG") == 1);
+    CHECK(all.size() >= 2 && (all[0] == "a/holder" || all[1] == "a/holder")); // plocate's come first
+}
+
+TEST(locate_pattern_escapes) {
+    CHECK_EQ(locate_pattern("/home/me/My (old) files", "a.b*"),
+             std::string("^/home/me/My \\(old\\) files/(.*/)?[^/]*a\\.b\\*[^/]*$"));
+    CHECK_EQ(locate_pattern("/", "x"), std::string("^/(.*/)?[^/]*x[^/]*$"));
 }
 
 TEST(listing_50k_entries_under_a_second) {
