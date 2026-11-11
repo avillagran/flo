@@ -28,7 +28,7 @@ the next phase), **Out** (left out of this phase on purpose).
 | Tab strip: current tab on a card with an accent line, ×, "+" on the right, middle click closes; tabs dragged to a new place (after 5 px an accent line shows the drop point, the release moves it, leaving the strip cancels); tab menu Close tab, Close other tabs, Close tabs to the right, Move left, Move right | Done (`fo::TabStrip::on_reorder`); Flo's New tab and Reopen closed tab follow in the tab menu |
 | 52 px rail expanding to 170 px on hover (350 ms) or when pinned; pinned/recent first, Home, Downloads, Documents, Pictures, Music, Videos, the trash at the bottom with the pin control | Done (`fo::Sidebar::rail`); Flo also lists its other home folders, drives and tailnet machines there |
 | Inspector (240 px): preview tile, name, kind, total size with "Recalculate · Ctrl+Space", "Rename · F2", Open / Preview, copy path / F5 / F6 | Done (`DetailsPane`); Flo adds picture dimensions and a trashed item's origin |
-| Status bar: marked and listed counts, a tip, filesystem and free space, live PSS | Done (`fo::StatusBar`); the tip is static (Files scrolls its tips) |
+| Status bar: marked and listed counts, a tip, filesystem and free space, live PSS | Done (`fo::StatusBar`). Files' nine tips (`status_tips.rs`) take turns every 15 s and name their keys in the active shortcut profile (a command without a key there points to the command palette); Files scrolls a long tip, Flo shows it elided |
 | Groups view: folder cards under "FOLDERS · n" with a new-folder button, files as rows under TODAY / THIS WEEK / EARLIER / UNDATED | Done (`Collection::Layout::Bands`) |
 | List view: 38 px rows, thumbnails or extension badges, size / date / type columns, sortable header | Done; sorting by name, size, date (newest/oldest) and type. Descending name order: Next |
 | Grid view: 156 x 132 cells with thumbnails; zoom 65–180 % (Ctrl++ / Ctrl+= / Ctrl+- / Ctrl+0, Ctrl+wheel, the − / + buttons) and the 36 px "Grid · n · thumbnails" header with the percentage | Done (cells, icons and the header follow Files' `grid_view.rs`; outside the Grid the keys say "Zoom only exists in the Grid view (Ctrl+5)") |
@@ -79,7 +79,7 @@ the next phase), **Out** (left out of this phase on purpose).
 | Size manager | Out |
 | Advanced renamer (patterns, sequences, regex) | Out |
 | Search facets (size and date filters) | Out |
-| Translations | Partial: English and Spanish (Files' own wording) are complete; the other 48 catalogs show English for the strings added with the Files look until they are translated |
+| Translations | Done for all 50 catalogs (`tools/i18n-check.py`: 50/50 complete, placeholders and CLDR plural forms checked). Files itself ships only Spanish: es-MX uses Files' own wording wherever a string matches (tab menu, completion notices, "Atajos: Files / Nautilus", the status tips); the other 48 languages are machine translations that keep each catalog's terms, still waiting for a native review |
 
 ## Desktop standards (Folio as the technical reference)
 

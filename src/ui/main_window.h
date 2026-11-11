@@ -163,6 +163,7 @@ private:
     fo::Breadcrumbs *crumbs_ = nullptr;
     int address_x_ = 124, address_w_ = 0; // Files' address card (y 10..48)
     std::optional<PathCompletion> completion_;
+    int tip_ = 0, tip_ticks_ = 0; // Files' status tips take turns
     fo::TextField *field_ = nullptr;
     fo::IconButton *field_ok_ = nullptr, *field_cancel_ = nullptr;
     fo::TabStrip *tab_strip_ = nullptr;

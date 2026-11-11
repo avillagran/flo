@@ -106,15 +106,34 @@ std::string pss_text() {
     return buf;
 }
 
-const char *kTips[] = {
-    "Ctrl+L: type >command or :place and press Enter to open the catalog",
-    "Type to filter: *.pdf, ext:rs,md, type:dir, !draft",
-    "Home/End go to the ends. Shift extends the range; Ctrl moves the focus without replacing marks",
-    "Insert marks and moves on; Ctrl+I inverts the selection",
-    "F5 copies and F6 moves to the other pane (F9)",
-    "Ctrl+Space measures the focused folder; Ctrl+Shift+Space all of them",
-    "Ctrl+Shift+P: every command, with its shortcut",
+// Files' status tips (status_tips.rs): each names its keys through the
+// active shortcut profile; a command without a key there is reached from
+// the command palette.
+struct Tip {
+    const char *text;
+    std::vector<Cmd> keys; // fill %1, %2, ... in order
 };
+const std::vector<Tip> &tips() {
+    static const std::vector<Tip> all = {
+        {"%1: type >command or :place and press Enter to open the filtered catalog; then pick an action or a destination.",
+         {Cmd::Location}},
+        {"Home/End go to the ends. Shift extends the range; Ctrl moves the focus without replacing marks.", {}},
+        {"Filter with *.rs or ext:pdf,md and press %1 to mark the matches. %2 clears the selection.",
+         {Cmd::SelectFiltered, Cmd::ClearSelection}},
+        {"%1 measures the listed folders and %2 the focused one; %3 reloads the folder.",
+         {Cmd::SizesListed, Cmd::SizeFocused, Cmd::Refresh}},
+        {"%1 filters names: *.pdf, ext:rs,md, type:dir, !draft. %2 marks and moves on; %3 marks without moving the focus.",
+         {Cmd::Filter, Cmd::MarkAdvance, Cmd::MarkToggle}},
+        {"File browser \xC2\xB7 Preferences (%1) \xC2\xB7 Actions (%2). %3 shows or hides hidden files.",
+         {Cmd::Settings, Cmd::Actions, Cmd::Hidden}},
+        {"%1 Groups, %2 List, %3 Columns, %4 Space and %5 Grid. Ctrl+wheel zooms the Grid.",
+         {Cmd::ViewGroups, Cmd::ViewList, Cmd::ViewColumns, Cmd::ViewSpace, Cmd::ViewGrid}},
+        {"%1 renames the focused item; %2 undoes it.", {Cmd::Rename, Cmd::Undo}},
+        {"%1 previews the selected file; Esc returns to the folder. %2 opens the actions of the focused item.",
+         {Cmd::Preview, Cmd::ContextMenu}},
+    };
+    return all;
+}
 
 } // namespace
 
@@ -794,8 +813,13 @@ void MainWindow::update_status() {
     if (!p)
         return;
     status_->left(p->status_text());
-    static int tip = 0;
-    status_->hint(fo::tr(kTips[size_t(tip) % (sizeof kTips / sizeof kTips[0])]));
+    const Tip &tip = tips()[size_t(tip_) % tips().size()];
+    std::string text = fo::tr(tip.text);
+    for (Cmd c : tip.keys) {
+        std::string k = key(c);
+        text = fo::i18n::arg(text, k.empty() ? fo::tr("the command palette") : k);
+    }
+    status_->hint(text);
     status_->right(fs_summary(is_virtual_folder(p->folder()) ? xdg::home() : p->folder()));
     if (opbar_ && opbar_->visible()) {
         opbar_->space(p->view() == Pane::View::Space && !split());
@@ -808,6 +832,11 @@ void MainWindow::pss_tick(void *data) {
     std::string s = pss_text();
     if (!s.empty())
         w->status_->badge(s, fo::theme().green());
+    // Files moves on to the next tip now and then (every 15 s here).
+    if (++w->tip_ticks_ % 5 == 0) {
+        ++w->tip_;
+        w->update_status();
+    }
     Fl::repeat_timeout(3.0, pss_tick, data);
 }
 
@@ -819,6 +848,7 @@ void MainWindow::language_changed() {
     rebuild_sidebar();
     details_->relabel();
     pane_moved(active_pane());
+    update_status(); // the tip and the counts in the new language
     redraw();
 }
 

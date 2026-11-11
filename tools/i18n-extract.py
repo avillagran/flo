@@ -40,6 +40,17 @@ DYNAMIC = [
     "Help and shortcuts", "Rename the selection", "Preview the focused item",
     "Copy the selection: review the destination", "Move the selection: review the destination",
     "Create a folder", "Send the selection to the trash", "Actions on files",
+    # Files' status tips (tips() in ui/main_window.cpp), filled with the profile's keys.
+    "%1: type >command or :place and press Enter to open the filtered catalog; then pick an action or a destination.",
+    "Home/End go to the ends. Shift extends the range; Ctrl moves the focus without replacing marks.",
+    "Filter with *.rs or ext:pdf,md and press %1 to mark the matches. %2 clears the selection.",
+    "%1 measures the listed folders and %2 the focused one; %3 reloads the folder.",
+    "%1 filters names: *.pdf, ext:rs,md, type:dir, !draft. %2 marks and moves on; %3 marks without moving the focus.",
+    "File browser \u00b7 Preferences (%1) \u00b7 Actions (%2). %3 shows or hides hidden files.",
+    "%1 Groups, %2 List, %3 Columns, %4 Space and %5 Grid. Ctrl+wheel zooms the Grid.",
+    "%1 renames the focused item; %2 undoes it.",
+    "%1 previews the selected file; Esc returns to the folder. %2 opens the actions of the focused item.",
+    "the command palette",
 ]
 
 call = re.compile(r'\b(?:fo::)?(trn?)\(\s*((?:"(?:[^"\\]|\\.)*"\s*)+)')
