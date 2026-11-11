@@ -1,5 +1,6 @@
 #include "ui/pane.h"
 
+#include "core/folder_views.h"
 #include "core/fsutil.h"
 #include "core/name_filter.h"
 #include "core/tree_size.h"
@@ -188,7 +189,29 @@ std::string Pane::title() const {
 
 // --- Views -----------------------------------------------------------------
 
-void Pane::set_view(View v) {
+Pane::View Pane::from_mode(ViewMode m) {
+    switch (m) {
+    case ViewMode::Grid: return View::Grid;
+    case ViewMode::List: return View::List;
+    case ViewMode::Columns: return View::Columns;
+    case ViewMode::Space: return View::Space;
+    case ViewMode::Groups: return View::Groups;
+    }
+    return View::Groups;
+}
+
+ViewMode Pane::to_mode(View v) {
+    switch (v) {
+    case View::Grid: return ViewMode::Grid;
+    case View::List: return ViewMode::List;
+    case View::Columns: return ViewMode::Columns;
+    case View::Space: return ViewMode::Space;
+    case View::Groups: return ViewMode::Groups;
+    }
+    return ViewMode::Groups;
+}
+
+void Pane::set_view(View v, bool remember) {
     FileView *old = files();
     std::vector<std::string> sel_paths;
     for (int i : old->selection())
@@ -219,13 +242,8 @@ void Pane::set_view(View v) {
         columns_->sync();
     if (v == View::Space && !dual_)
         space_->sync();
-    if (!dual_ && win_->index_of(this) == 0) {
-        ViewMode m = v == View::Grid      ? ViewMode::Grid
-                     : v == View::List    ? ViewMode::List
-                     : v == View::Columns ? ViewMode::Columns
-                     : v == View::Space   ? ViewMode::Space
-                                          : ViewMode::Groups;
-        App::get().settings().view = m;
+    if (remember && !dual_ && win_->index_of(this) == 0) {
+        App::get().settings().view = to_mode(v);
         App::get().save_settings();
     }
     place_children();
@@ -320,6 +338,16 @@ void Pane::navigate(const std::string &path, const std::string &select, bool his
     keep_paths_.clear();
     keep_current_.clear();
     folder_ = p;
+    // Files' saved folder view: the view (not in the dual pane), the sort
+    // and the zoom; folders without one keep what the pane shows.
+    if (const FolderView *fv = App::get().folder_views().get(p)) {
+        if (!dual_)
+            view_ = from_mode(fv->view);
+        sort_ = fv->sort;
+        grid_zoom_ = std::clamp(fv->zoom_percent / 100.0, kZoomMin, kZoomMax);
+        grid_->zoom(grid_zoom_);
+        list_header_->columns(list_header_columns());
+    }
     model_.base = p;
     model_.entries.clear();
     model_.peeks.clear();
@@ -465,7 +493,32 @@ void Pane::landed(ListingPtr l, bool keep) {
     model_.loading = !l->complete;
     if (!same)
         v->reload(false);
-    if (!pending_select_.empty()) {
+    if ((!restore_marks_.empty() || !restore_current_.empty()) && l->complete) {
+        v->clear_selection();
+        int first = -1;
+        for (const auto &n : restore_marks_) {
+            int at = model_.index_of_name(n);
+            if (at >= 0) {
+                v->select(at, true);
+                if (first < 0)
+                    first = at;
+            }
+        }
+        int c = model_.index_of_name(restore_current_);
+        if (c >= 0)
+            v->set_current(c, restore_marks_.empty());
+        else if (first >= 0)
+            v->set_current(first, false);
+        else
+            v->set_current(model_.count() > 0 ? 0 : -1, true);
+        if (c >= 0 && !restore_marks_.empty())
+            for (const auto &n : restore_marks_)
+                if (int at = model_.index_of_name(n); at >= 0)
+                    v->select(at, true);
+        restore_marks_.clear();
+        restore_current_.clear();
+        pending_select_.clear();
+    } else if (!pending_select_.empty()) {
         int at = model_.index_of_name(pending_select_);
         if (at < 0)
             at = model_.index_of_path(pending_select_);
@@ -1024,10 +1077,12 @@ void Pane::toggle_hidden() {
         columns_->refresh();
 }
 
-void Pane::set_sort(SortMode m) {
+void Pane::set_sort(SortMode m, bool remember) {
     sort_ = m;
-    App::get().settings().sort = m;
-    App::get().save_settings();
+    if (remember) {
+        App::get().settings().sort = m;
+        App::get().save_settings();
+    }
     win_->pane_view_changed(this);
     if (query_.empty())
         reload(true);
@@ -2041,6 +2096,98 @@ void Pane::measure_listed() {
     if (!folders.empty())
         App::get().sizes().request(folders, true);
     win_->sizes_changed();
+}
+
+// --- Folder views and the session ------------------------------------------------
+
+bool Pane::has_folder_view() const { return App::get().folder_views().get(folder_) != nullptr; }
+
+void Pane::save_folder_view() {
+    if (in_recents() || folder_.empty() || folder_[0] != '/')
+        return;
+    FolderViews &fv = App::get().folder_views();
+    FolderView v;
+    v.path = folder_;
+    v.view = to_mode(view_);
+    v.sort = sort_;
+    v.zoom_percent = int(std::lround(grid_zoom_ * 100.0));
+    if (!fv.set(v)) {
+        fo::Toast::show(win_, fo::tr(fv.error().c_str()), 3, fo::Toast::Error);
+        return;
+    }
+    if (!fv.save()) {
+        fo::Toast::show(win_, fo::tr("The folder views can't be saved."), 3, fo::Toast::Error);
+        return;
+    }
+    fo::Toast::show(win_, fo::tr("This folder's view is saved"), 2.5);
+}
+
+void Pane::forget_folder_view() {
+    FolderViews &fv = App::get().folder_views();
+    if (!fv.forget(folder_)) {
+        fo::Toast::show(win_, fo::tr("This folder has no saved view"), 2.5);
+        return;
+    }
+    if (!fv.save()) {
+        fo::Toast::show(win_, fo::tr("The folder views can't be saved."), 3, fo::Toast::Error);
+        return;
+    }
+    fo::Toast::show(win_, fo::tr("Preference removed; the folder is untouched"), 2.5);
+}
+
+TabState Pane::tab_state() const {
+    TabState t;
+    t.folder = in_recents() ? xdg::home() : folder_;
+    for (const auto &b : back_)
+        if (b != kRecents)
+            t.back.push_back(b);
+    for (const auto &f : forward_)
+        if (f != kRecents)
+            t.forward.push_back(f);
+    while (t.back.size() + t.forward.size() > Session::kMaxHistory)
+        t.back.size() > t.forward.size() ? (void)t.back.erase(t.back.begin()) : (void)t.forward.erase(t.forward.begin());
+    t.view = to_mode(view_);
+    t.sort = sort_;
+    t.zoom_percent = std::clamp(int(std::lround(grid_zoom_ * 100.0)), 65, 180);
+    t.filter = filter_.size() <= 256 ? filter_ : std::string();
+    if (!in_recents() && query_.empty()) {
+        FileView *v = files();
+        for (int i : v->selection())
+            if (t.selected.size() < Session::kMaxSelected && model_.entries[size_t(i)].name.find('/') == std::string::npos)
+                t.selected.push_back(model_.entries[size_t(i)].name);
+        if (v->current() >= 0 && v->current() < model_.count())
+            t.current = model_.entries[size_t(v->current())].name;
+        // Files marks the focused item on arrival; that mark alone is not kept.
+        if (t.selected.size() == 1 && t.selected[0] == t.current)
+            t.selected.clear();
+    }
+    return t;
+}
+
+void Pane::apply_tab_state(const TabState &t) {
+    if (!is_dir(t.folder))
+        return;
+    view_ = from_mode(t.view);
+    sort_ = t.sort;
+    grid_zoom_ = std::clamp(t.zoom_percent / 100.0, kZoomMin, kZoomMax);
+    grid_->zoom(grid_zoom_);
+    navigate(t.folder, {}, false);
+    // A saved folder view applied on arrival; the session's own state wins.
+    if (!dual_)
+        view_ = from_mode(t.view);
+    sort_ = t.sort;
+    grid_zoom_ = std::clamp(t.zoom_percent / 100.0, kZoomMin, kZoomMax);
+    grid_->zoom(grid_zoom_);
+    back_ = t.back;
+    forward_ = t.forward;
+    filter_ = t.filter;
+    all_.clear();
+    restore_marks_ = t.selected;
+    restore_current_ = t.current;
+    // The listing asked for by navigate() lands with these (filter, marks).
+    order_for_view();
+    files()->reload(true);
+    after_folder_change();
 }
 
 void Pane::sizes_arrived() {

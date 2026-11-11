@@ -7,6 +7,7 @@
 #pragma once
 
 #include "core/places.h"
+#include "core/session.h"
 
 #include "fltk-omarchy/anim.h"
 #include "fltk-omarchy/window.h"
@@ -56,6 +57,13 @@ public:
     void close_tab(int i);
     void reopen_tab();
     void select_tab(int i);
+
+    // The session: this window's tabs (not the dual pane), and showing a
+    // saved one. The owner window saves it again when it closes.
+    Session session_state() const;
+    void restore_session(const Session &s);
+    void session_owner(bool on) { session_owner_ = on; }
+    bool session_owner() const { return session_owner_; }
 
     // F9: the dual view.
     void toggle_dual();
@@ -134,6 +142,7 @@ private:
     int active_ = 0; // 0: the tab, 1: the dual pane
     bool details_on_ = true;
     Field field_mode_ = Field::None;
+    bool session_owner_ = false;
     std::string pss_;
 };
 

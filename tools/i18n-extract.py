@@ -23,6 +23,9 @@ DYNAMIC = [
     "Name", "Kind", "Newest", "Oldest", "Size",
     # Folder errors from flo-core's lister, shown as they come.
     "This folder no longer exists.", "You don't have permission to open this folder.", "This is not a folder.",
+    # Saved folder views (core/folder_views.cpp), shown as they come.
+    "Up to 256 folders keep a view; forget one first.", "Only local folders keep a view.",
+    "The folder views file can't be changed.",
 ]
 
 call = re.compile(r'\b(?:fo::)?(trn?)\(\s*((?:"(?:[^"\\]|\\.)*"\s*)+)')

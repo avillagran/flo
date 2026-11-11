@@ -6,6 +6,7 @@
 
 #include "core/dbus_service.h"
 #include "core/event_queue.h"
+#include "core/folder_views.h"
 #include "core/lister.h"
 #include "core/network.h"
 #include "core/places.h"
@@ -64,7 +65,8 @@ private:
 class App {
 public:
     static App &get();
-    int run(const std::string &folder, const std::string &select);
+    // `restore`: Flo started without a folder (Files' session restore).
+    int run(const std::string &folder, const std::string &select, bool restore = false);
 
     EventQueue &queue() { return *queue_; }
     ThumbnailService &thumbnail_service() { return *thumb_service_; }
@@ -75,6 +77,11 @@ public:
     Devices &devices() { return *devices_; }
     Network &network() { return *network_; }
     Settings &settings() { return settings_; }
+    // Files' saved folder views (read once, at the first use).
+    FolderViews &folder_views();
+    // Saves this window's tabs as the session ("Save session"); the
+    // window then keeps it saved when it closes.
+    void save_session(MainWindow *w, bool quiet = false);
     // Folders just left by any window, for instant Back/Forward.
     ListingCache &listings() { return listings_; }
     const PlacesData &places() const { return places_; }
@@ -116,6 +123,8 @@ private:
     std::unique_ptr<Network> network_;
     std::unique_ptr<DBusService> dbus_;
     Settings settings_;
+    FolderViews folder_views_;
+    bool folder_views_loaded_ = false;
     ListingCache listings_;
     PlacesData places_;
     PreviewClient preview_;

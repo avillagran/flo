@@ -492,6 +492,10 @@
   "plural": false
  },
  {
+  "source": "Forget this folder's view",
+  "plural": false
+ },
+ {
   "source": "Forward",
   "plural": false
  },
@@ -740,6 +744,10 @@
   "plural": false
  },
  {
+  "source": "Only local folders keep a view.",
+  "plural": false
+ },
+ {
   "source": "Open",
   "plural": false
  },
@@ -809,6 +817,10 @@
  },
  {
   "source": "Places",
+  "plural": false
+ },
+ {
+  "source": "Preference removed; the folder is untouched",
   "plural": false
  },
  {
@@ -896,6 +908,18 @@
   "plural": false
  },
  {
+  "source": "Save only this group",
+  "plural": false
+ },
+ {
+  "source": "Save session",
+  "plural": false
+ },
+ {
+  "source": "Save this folder's view",
+  "plural": false
+ },
+ {
   "source": "Scroll text",
   "plural": false
  },
@@ -969,6 +993,10 @@
  },
  {
   "source": "Session and help",
+  "plural": false
+ },
+ {
+  "source": "Session saved",
   "plural": false
  },
  {
@@ -1108,6 +1136,18 @@
   "plural": false
  },
  {
+  "source": "The folder views can't be saved.",
+  "plural": false
+ },
+ {
+  "source": "The folder views file can't be changed.",
+  "plural": false
+ },
+ {
+  "source": "The session can't be saved.",
+  "plural": false
+ },
+ {
   "source": "Theme: System (live)",
   "plural": false
  },
@@ -1124,7 +1164,15 @@
   "plural": false
  },
  {
+  "source": "This folder has no saved view",
+  "plural": false
+ },
+ {
   "source": "This folder no longer exists.",
+  "plural": false
+ },
+ {
+  "source": "This folder's view is saved",
   "plural": false
  },
  {
@@ -1185,6 +1233,10 @@
  },
  {
   "source": "Up to %1 tabs",
+  "plural": false
+ },
+ {
+  "source": "Up to 256 folders keep a view; forget one first.",
   "plural": false
  },
  {

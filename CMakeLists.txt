@@ -35,6 +35,7 @@ add_library(flo-core STATIC
   src/core/entry.cpp
   src/core/event_queue.cpp
   src/core/fileops.cpp
+  src/core/folder_views.cpp
   src/core/fsutil.cpp
   src/core/gmain_thread.cpp
   src/core/json.cpp
@@ -47,6 +48,7 @@ add_library(flo-core STATIC
   src/core/process.cpp
   src/core/recents.cpp
   src/core/search.cpp
+  src/core/session.cpp
   src/core/settings.cpp
   src/core/thumbnail_cache.cpp
   src/core/thumbnail_service.cpp

@@ -270,7 +270,27 @@ void tune_malloc() {
     mallopt(M_MMAP_THRESHOLD, 64 * 1024);
 }
 
-int App::run(const std::string &folder, const std::string &select) {
+FolderViews &App::folder_views() {
+    if (!folder_views_loaded_) {
+        folder_views_loaded_ = true;
+        folder_views_.load();
+    }
+    return folder_views_;
+}
+
+void App::save_session(MainWindow *w, bool quiet) {
+    if (!w)
+        return;
+    for (MainWindow *o : windows_)
+        o->session_owner(o == w);
+    Session s = w->session_state();
+    bool ok = s.save();
+    if (!quiet)
+        fo::Toast::show(w, ok ? fo::tr("Session saved") : fo::tr("The session can't be saved."), 2.5,
+                        ok ? fo::Toast::Info : fo::Toast::Error);
+}
+
+int App::run(const std::string &folder, const std::string &select, bool restore) {
     tune_malloc();
     settings_ = Settings::load();
     register_catalogs();
@@ -297,7 +317,15 @@ int App::run(const std::string &folder, const std::string &select) {
     refresh_places();
     bookmarks_watch_ = watcher_->watch_file(places::bookmarks_path(), [this] { refresh_places(); });
 
-    open_window(folder, select);
+    MainWindow *first = open_window(folder, select);
+    if (restore) {
+        // Files restores the last session when it starts without a folder;
+        // this window keeps it saved when it closes.
+        first->session_owner(true);
+        Session s;
+        if (Session::load(s))
+            first->restore_session(s);
+    }
     // Omarchy's language picked live: every window relabels (Folio does too).
     fo::i18n::on_change([this] {
         for (MainWindow *w : windows_)
@@ -349,7 +377,7 @@ int App::run(const std::string &folder, const std::string &select) {
 
 } // namespace flo::ui
 
-int run_gui(const std::string &folder, const std::string &select) {
+int run_gui(const std::string &folder, const std::string &select, bool restore) {
     signal(SIGPIPE, SIG_IGN);
-    return flo::ui::App::get().run(folder, select);
+    return flo::ui::App::get().run(folder, select, restore);
 }

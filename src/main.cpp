@@ -17,7 +17,7 @@
 // or nothing for home. A file opens its folder with the file selected.
 static void start_location(int argc, char **argv, std::string &folder, std::string &select) {
     folder = flo::xdg::home();
-    if (argc < 2)
+    if (argc < 2 || std::string(argv[1]) == "--no-session")
         return;
     const std::string arg = argv[1];
     std::string path = flo::uri_to_path(arg);
@@ -32,7 +32,8 @@ static void start_location(int argc, char **argv, std::string &folder, std::stri
 }
 
 #ifdef FLO_HAVE_GUI
-int run_gui(const std::string &folder, const std::string &select); // src/ui/app.cpp
+// `restore`: no folder was given, so the last session comes back (Files).
+int run_gui(const std::string &folder, const std::string &select, bool restore); // src/ui/app.cpp
 int run_preview(int argc, char **argv);                             // src/ui/preview.cpp
 #endif
 
@@ -50,7 +51,7 @@ int main(int argc, char **argv) {
         return 0;
 
 #ifdef FLO_HAVE_GUI
-    return run_gui(folder, select);
+    return run_gui(folder, select, argc < 2);
 #else
     std::fprintf(stderr, "flo: GUI not built yet (would open %s%s%s). Try `flo help`.\n", folder.c_str(),
                  select.empty() ? "" : ", selecting ", select.c_str());

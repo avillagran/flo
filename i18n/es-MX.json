@@ -314,5 +314,18 @@
  "Selection tools": "Herramientas de selección",
  "Show hidden": "Mostrar ocultos",
  "Subfolders not watched · not a snapshot": "Subcarpetas sin vigilancia · no es una instantánea",
- "Unknown size": "Tamaño desconocido"
+ "Unknown size": "Tamaño desconocido",
+ "Forget this folder's view": "Olvidar vista de esta carpeta",
+ "Preference removed; the folder is untouched": "Preferencia quitada; carpeta intacta",
+ "Save only this group": "Guardar sólo este grupo",
+ "Save session": "Guardar sesión",
+ "Save this folder's view": "Guardar vista de esta carpeta",
+ "Session saved": "Sesión guardada",
+ "The folder views can't be saved.": "No se pudieron guardar las vistas de carpetas.",
+ "The session can't be saved.": "No se pudo guardar la sesión.",
+ "This folder has no saved view": "Esta carpeta no tiene una vista guardada",
+ "This folder's view is saved": "Vista de esta carpeta guardada",
+ "Up to 256 folders keep a view; forget one first.": "Hasta 256 carpetas guardan una vista; olvida una primero.",
+ "Only local folders keep a view.": "Sólo las carpetas locales guardan una vista.",
+ "The folder views file can't be changed.": "Vistas de carpetas inválidas, incompatibles o fuera de presupuesto; se conservan sin modificar"
 }

@@ -361,6 +361,49 @@ void MainWindow::reopen_tab() {
     new_tab(f);
 }
 
+Session MainWindow::session_state() const {
+    Session s;
+    for (Pane *p : tabs_)
+        if (s.tabs.size() < Session::kMaxTabs)
+            s.tabs.push_back(p->tab_state());
+    s.active = std::min(tab_, int(s.tabs.size()) - 1);
+    for (const auto &c : closed_tabs_)
+        if (!c.empty() && c[0] == '/')
+            s.closed.push_back(c);
+    while (s.closed.size() > Session::kMaxClosed)
+        s.closed.erase(s.closed.begin());
+    return s;
+}
+
+void MainWindow::restore_session(const Session &s) {
+    std::vector<const TabState *> ok;
+    for (const auto &t : s.tabs)
+        if (is_dir(t.folder))
+            ok.push_back(&t);
+    if (ok.empty())
+        return;
+    int active = 0;
+    for (size_t i = 0; i < ok.size(); ++i)
+        if (ok[i] == &s.tabs[size_t(std::clamp(s.active, 0, int(s.tabs.size()) - 1))])
+            active = int(i);
+    tabs_[0]->apply_tab_state(*ok[0]);
+    for (size_t i = 1; i < ok.size() && int(tabs_.size()) < kMaxTabs; ++i) {
+        Pane *p = make_pane(ok[i]->folder, int(Pane::from_mode(ok[i]->view)));
+        p->apply_tab_state(*ok[i]);
+        p->hide();
+        tabs_.push_back(p);
+    }
+    closed_tabs_ = s.closed;
+    select_tab(std::min(active, int(tabs_.size()) - 1));
+    if (!active_pane()->filter().empty()) {
+        field_mode_ = Field::Filter;
+        field_->placeholder(fo::tr("Type to filter: *.pdf, ext:md, type:dir, !draft"));
+        field_->set_text(active_pane()->filter());
+        layout();
+        update_header();
+    }
+}
+
 void MainWindow::update_tabs() {
     std::vector<std::string> labels;
     for (Pane *p : tabs_)
@@ -495,6 +538,8 @@ void MainWindow::draw() {
 int MainWindow::handle(int event) { return fo::Window::handle(event); }
 
 void MainWindow::hide() {
+    if (session_owner_ && !tabs_.empty())
+        session_state().save(); // Files saves the session when its window closes
     if (shown() && !maximize_active()) {
         App::get().settings().window_width = w();
         App::get().settings().window_height = h();
@@ -815,6 +860,12 @@ std::vector<fo::MenuItem> MainWindow::preferences_items() {
     std::vector<MenuItem> folder = {
         MenuItem(fo::tr("Reload"), "Ctrl+R", [this] { active_pane()->reload(true); }).with_icon("refresh"),
         MenuItem(fo::tr("Sort by\xE2\x80\xA6"), "Ctrl+Shift+S", [this] { active_pane()->sort_menu(); }).with_icon("sort"),
+        MenuItem(fo::tr("Save this folder's view"), "", [this] { active_pane()->save_folder_view(); })
+            .with_icon("save")
+            .disabled(p->in_recents()),
+        MenuItem(fo::tr("Forget this folder's view"), "", [this] { active_pane()->forget_folder_view(); })
+            .with_icon("x")
+            .disabled(!p->has_folder_view()),
     };
     std::vector<MenuItem> view = {
         MenuItem(fo::tr("Show hidden files"), "Ctrl+H", [this] { active_pane()->toggle_hidden(); })
@@ -851,6 +902,9 @@ std::vector<fo::MenuItem> MainWindow::preferences_items() {
         MenuItem(fo::tr("Theme: System (live)"), "", nullptr).check(true),
     };
     std::vector<MenuItem> help = {
+        MenuItem(dual_ ? fo::tr("Save only this group") : fo::tr("Save session"), "",
+                 [this] { App::get().save_session(this); })
+            .with_icon("save"),
         MenuItem(fo::tr("Shortcut help"), "F1", [this] { show_help(); }).with_icon("help"),
         MenuItem(fo::tr("Commands"), "Ctrl+Shift+P", [this] { commands(); }).with_icon("terminal"),
     };

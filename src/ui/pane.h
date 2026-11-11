@@ -13,6 +13,7 @@
 #include "core/mounter.h"
 #include "core/process.h"
 #include "core/search.h"
+#include "core/session.h"
 #include "core/settings.h"
 #include "ui/util.h"
 
@@ -52,7 +53,19 @@ public:
     FolderModel &model() { return model_; }
     const FolderModel &model() const { return model_; }
     View view() const { return view_; }
-    void set_view(View v);
+    // `remember`: the first pane's choice becomes the default view.
+    void set_view(View v, bool remember = true);
+    static View from_mode(ViewMode m);
+    static ViewMode to_mode(View v);
+    // Files' saved folder views: this folder's view, sort and zoom kept
+    // (applied whenever it is opened again) or dropped.
+    void save_folder_view();
+    void forget_folder_view();
+    bool has_folder_view() const;
+    // The session (Files' session_store.rs): what this tab shows, and
+    // showing it again.
+    TabState tab_state() const;
+    void apply_tab_state(const TabState &t);
     // The second pane of the dual view: compact rows and its own small
     // header (folder · path), whatever its view.
     void dual(bool on);
@@ -102,7 +115,7 @@ public:
     void undo();
     void redo();
     void toggle_hidden();
-    void set_sort(SortMode m);
+    void set_sort(SortMode m, bool remember = true);
     // Files' Grid zoom (Ctrl++ / Ctrl+- / Ctrl+0, Ctrl+wheel): cells and
     // icons scale by `grid_zoom` in [0.65, 1.8], 1.15 per step.
     static constexpr double kZoomMin = 0.65, kZoomMax = 1.8, kZoomStep = 1.15;
@@ -229,6 +242,9 @@ private:
     std::vector<std::string> back_, forward_;
     std::vector<std::pair<std::string, std::string>> crumbs_; // label, path
     std::string pending_select_;
+    // A restored tab's marks and focus, applied once its listing is complete.
+    std::vector<std::string> restore_marks_;
+    std::string restore_current_;
     std::vector<std::string> keep_paths_;
     std::string keep_current_;
 

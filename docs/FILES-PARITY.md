@@ -51,7 +51,7 @@ the next phase), **Out** (left out of this phase on purpose).
 | Ctrl+A, Ctrl+I invert, Ctrl+Shift+A mark filtered, Ctrl+Shift+D clear, Insert marks and advances | Done; Ctrl+Insert (mark without moving) and Ctrl+arrows moving the focus without marks: Next |
 | Enter, Backspace / Alt+Up, Alt+Left/Right, Alt+Home, Alt+Down (ancestors menu) | Done |
 | Ctrl+Enter / Shift+Enter open a folder in a new / background tab | Done |
-| Ctrl+T, Ctrl+W, Ctrl+Shift+T, Ctrl+Tab / Ctrl+PgDn, Ctrl+Shift+Tab / Ctrl+PgUp (up to 8 tabs) | Done; moving tabs (Ctrl+Shift+PgUp/PgDn) and restoring the last session: Next |
+| Ctrl+T, Ctrl+W, Ctrl+Shift+T, Ctrl+Tab / Ctrl+PgDn, Ctrl+Shift+Tab / Ctrl+PgUp (up to 8 tabs) | Done; the last session comes back at start (see Behavior); moving tabs (Ctrl+Shift+PgUp/PgDn): Next |
 | F2 rename | Done (a single rename; the advanced renamer: Out) |
 | F5 copy / F6 move (destination reviewed first) | Done (a destination prompt, then Flo's queue with conflicts and undo); Files' copy queue with pause and rescue: Next |
 | F7 / Ctrl+Shift+N new folder, Ctrl+N new file | Done (a new file is created exclusively, never overwriting; it has no undo yet) |
@@ -73,7 +73,7 @@ the next phase), **Out** (left out of this phase on purpose).
 | The first entry is focused on arrival; the selection survives reloads | Done |
 | Hidden files off by default, persisted | Done |
 | Preferences: window normal / fullscreen, show thumbnails, automatic sizes, keep the rail open | Done; Files' border styles and alternate theme: Next |
-| Sessions and saved per-folder views | Next |
+| Sessions and saved per-folder views | Done: "Save / Forget this folder's view" (Preferences → Folder, `core/folder_views.h`, up to 256 folders) keeps a folder's view, sort and zoom and applies them whenever it opens; folders without one keep what the pane shows. `flo` without a folder restores the last session (`core/session.h`: tabs with history, view, sort, zoom, filter, marks and focus, the closed tabs, the active tab); it is saved when that window closes and with "Save session"; `flo PATH` and `flo --no-session` leave it alone |
 | Directory sync and compare | Out |
 | Size manager | Out |
 | Advanced renamer (patterns, sequences, regex) | Out |
