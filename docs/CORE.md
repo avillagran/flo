@@ -37,7 +37,7 @@ UI. A CLI or test loops on `queue.wait(ms)` and `queue.dispatch()`.
 | `event_queue.h` | `EventQueue`, `CancelToken`, `AliveGuard`, `Executor` | Delivery to the UI thread, cancellation, serial workers |
 | `entry.h` | `Entry`, `Kind`, `SortMode`, `sort_entries` | Folder entries (type by GIO content type, sniffed only when the name doesn't tell), Folio's kinds and five sort modes, folders first |
 | `natural_sort.h` | `natural_compare`, `fold_case` | Case-insensitive natural order ("file2" < "file10") |
-| `lister.h` | `Lister`, `Listing`, `list_folder`, `count_items` | Off-thread listing with snapshots for slow folders, lazy folder item counts |
+| `lister.h` | `Lister`, `Listing`, `list_folder`, `summarize_folder`, `ListingCache` | Off-thread listing with snapshots for slow folders, lazy folder summaries (item count and a peek of the first two pictures), remembered listings for instant Back/Forward |
 | `watcher.h` | `Watcher` | inotify live reload, debounced (250 ms), folder or single file (recently-used.xbel) |
 | `search.h` | `Searcher`, `search_locate`, `search_walk` | `/` search: plocate's matches first when it has a database, then a breadth-first walk for the rest; same filesystem, no symlinked folders, streamed, cancellable |
 | `thumbnail_cache.h` | `ThumbnailCache`, `read_png_meta`, `thumbnail_matches` | The shared freedesktop cache read as untrusted input |
@@ -61,7 +61,10 @@ UI. A CLI or test loops on `queue.wait(ms)` and `queue.dispatch()`.
 
 - **Folder view.** One `Lister` per pane. `list(folder, options, cb)` gives
   `ListingPtr` snapshots (`complete == false`) and a final listing. Ask
-  `count_items(visible folders first)` after it lands. Register the folder
+  `count_items(visible folders first, ..., peek = 2)` after it lands; each
+  `FolderSummary` brings the count and the folder's peek. Leaving a folder,
+  move the listing into the shared `ListingCache`; arriving, `take()` it
+  to show at once, and keep it when the re-read is `same_listing`. Register the folder
   with `Watcher::watch_folder` and list again on change. Recents:
   `recents::list(recents::xbel_path(), ...)` on a worker, plus
   `Watcher::watch_file(xbel)`.
@@ -148,3 +151,12 @@ which creates `build/test-runs/run-<time>-<random>/` (0700) with its own
 it afterwards. The test binary refuses to run outside such a directory.
 Fixtures come from `flo_test::private_dir()`; symlink fixtures point inside
 their fixture; nothing deletes a tree.
+
+Test hooks, honoured only when `FLO_TEST_RUN` is set (by the test runner
+and `tools/gui-session.sh`, never for a user; see `xdg::test_hook`):
+`FLO_TEST_MOUNTINFO` reads a mountinfo fixture instead of
+`/proc/self/mountinfo` and unmounts or ejects its drives by editing the
+fixture; `FLO_TEST_FAKE_GVFS` stands in for GVfs's SFTP backend on the real
+`GMountOperation` (host-key question, password, retries). `FLO_PLOCATE` and
+`FLO_PLOCATE_DB` choose plocate and its database (tests use a private
+`updatedb -o` database).
