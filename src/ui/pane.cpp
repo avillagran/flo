@@ -42,7 +42,7 @@ namespace flo::ui {
 
 namespace {
 
-const int kBanner = 40, kTrashBar = 48, kDualHeader = 28, kListHeader = 30;
+const int kBanner = 40, kTrashBar = 48, kDualHeader = 28, kListHeader = 30, kDualFooter = 24;
 
 std::string quoted(const std::string &s) { return "\xE2\x80\x9C" + s + "\xE2\x80\x9D"; }
 
@@ -632,7 +632,8 @@ void Pane::forward() {
 
 void Pane::go_home() { navigate(xdg::home()); }
 
-std::string Pane::typed_path() const { return in_recents() ? std::string() : tilde(folder_); }
+// Files' omnibar starts from the absolute path, all of it selected.
+std::string Pane::typed_path() const { return in_recents() ? std::string() : folder_; }
 
 bool Pane::go_typed(const std::string &text) {
     if (!uri_scheme(text).empty() && uri_scheme(text) != "file") {
@@ -861,6 +862,8 @@ void Pane::focus_view() {
 }
 
 void Pane::selection_changed() {
+    if (dual_)
+        redraw(); // the footer's marks
     if (view_ == View::Columns)
         columns_->selection_changed();
     win_->pane_selected(this);
@@ -1655,7 +1658,7 @@ void Pane::place_children() {
     } else {
         list_header_->hide();
     }
-    int vh = std::max(10, y() + h() - 8 - ty);
+    int vh = std::max(10, y() + h() - 8 - ty - (dual_ ? kDualFooter : 0));
     bool cols = view_ == View::Columns && !dual_, space = view_ == View::Space && !dual_;
     cols ? columns_->show() : columns_->hide();
     space ? space_->show() : space_->hide();
@@ -1720,6 +1723,16 @@ void Pane::draw() {
                        fo::text::REGULAR, 12);
     }
     draw_children();
+    if (dual_) {
+        // Files' dual footer: visible and loaded counts, the marks, Tab.
+        std::string foot = fo::i18n::arg(fo::tr("%1 visible"), std::to_string(model_.count())) + " \xC2\xB7 " +
+                           fo::i18n::arg(fo::tr("%1 loaded"), std::to_string(unfiltered_count())) + " \xC2\xB7 " +
+                           fo::trn("%n marked", files()->selection_count());
+        if (win_->active_pane() == this)
+            foot += std::string(" \xC2\xB7 ") + fo::tr("Tab switches pane");
+        fo::text::draw(foot, x() + 14, y() + h() - 8 - kDualFooter, w() - 28, kDualFooter, t.dim(), fo::text::REGULAR,
+                       10);
+    }
 }
 
 int Pane::handle(int event) {

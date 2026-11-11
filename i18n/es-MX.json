@@ -288,5 +288,8 @@
  "syncing": "sincronizando",
  "wheel scrolls": "rueda desplaza",
  "yesterday": "ayer",
- "↑↓ or wheel · Enter runs · Esc closes": "↑↓ o rueda · Enter ejecuta · Esc cierra"
+ "↑↓ or wheel · Enter runs · Esc closes": "↑↓ o rueda · Enter ejecuta · Esc cierra",
+ "%1 visible": "%1 visibles",
+ "%1 loaded": "%1 cargados",
+ "Tab switches pane": "Tab cambia panel"
 }

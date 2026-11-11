@@ -32,6 +32,10 @@
   "plural": false
  },
  {
+  "source": "%1 loaded",
+  "plural": false
+ },
+ {
   "source": "%1 min ago",
   "plural": false
  },
@@ -49,6 +53,10 @@
  },
  {
   "source": "%1 shown",
+  "plural": false
+ },
+ {
+  "source": "%1 visible",
   "plural": false
  },
  {
@@ -981,6 +989,10 @@
  },
  {
   "source": "Tab created",
+  "plural": false
+ },
+ {
+  "source": "Tab switches pane",
   "plural": false
  },
  {

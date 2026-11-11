@@ -107,11 +107,12 @@ void CommandPalette::run(int i) {
 }
 
 void CommandPalette::place() {
-    cw_ = std::min(w() - 32, 720);
-    ch_ = std::min(h() - 64, 560);
-    cx_ = (w() - cw_) / 2;
-    cy_ = std::max(16, (h() - ch_) / 3);
-    field_->resize(cx_ + kPad, cy_ + 56, cw_ - 2 * kPad, kFieldH);
+    // Files' palette covers the window under the header.
+    cx_ = 0;
+    cy_ = 58;
+    cw_ = w();
+    ch_ = std::max(120, h() - 58 - 32);
+    field_->resize(cx_ + kPad, cy_ + 56, std::min(cw_ - 2 * kPad, 760), kFieldH);
     list_y_ = cy_ + 56 + kFieldH + 34;
     rows_ = std::max(1, (cy_ + ch_ - 40 - list_y_) / kRowH);
 }
@@ -122,7 +123,8 @@ int CommandPalette::handle(int event) {
     switch (event) {
     case FL_PUSH: {
         int ex = Fl::event_x(), ey = Fl::event_y();
-        if (ex < cx_ || ex >= cx_ + cw_ || ey < cy_ || ey >= cy_ + ch_) {
+        if (ey < cy_ || ey >= cy_ + ch_ ||
+            (ey < cy_ + 40 && ex >= cx_ + cw_ - kPad - 80)) { // outside, or "× Esc"
             close();
             return 1;
         }
@@ -152,10 +154,10 @@ int CommandPalette::handle(int event) {
 void CommandPalette::draw() {
     const fo::Theme &t = fo::theme();
     double a = presence();
-    fo::paint::fill(x(), y(), w(), h(), fo::Rgb(0, 0, 0), 0.45 * a);
-    int r = t.radius() > 0 ? 10 : 0;
-    fo::paint::round_fill(cx_, cy_, cw_, ch_, r, t.accent());
-    fo::paint::round_fill(cx_ + 1, cy_ + 1, cw_ - 2, ch_ - 2, r, t.background());
+    (void)a;
+    fo::paint::fill(cx_, cy_, cw_, ch_, t.background());
+    fo::paint::hline(cx_, cy_, cw_, t.card());
+    fo::paint::hline(cx_, cy_ + ch_ - 1, cw_, t.card());
     fo::icon::draw("terminal", cx_ + kPad, cy_ + 18, 16, t.foreground());
     fo::text::draw(title_, cx_ + kPad + 26, cy_ + 12, cw_ - 2 * kPad, 28, t.bright_foreground(), fo::text::REGULAR,
                    15);
