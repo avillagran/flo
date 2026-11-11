@@ -1340,8 +1340,7 @@ std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const st
     if (!item && trash_view)
         m.push_back(MenuItem(fo::tr("Empty Trash\xE2\x80\xA6"), "", [this] { empty_trash(); }));
     if (item) {
-        m.push_back(MenuItem(for_folder ? fo::tr("Open Folder") : fo::tr("Open"), "\xE2\x8F\x8E",
-                             [this, target] { open_path(target); }));
+        m.push_back(MenuItem(fo::tr("Open focused item"), "Enter", [this, target] { open_path(target); }).with_icon("open"));
         if (!for_folder && !trash_view) {
             auto apps = apps_for(e.mime);
             if (apps.size() > 1) {
@@ -1365,7 +1364,7 @@ std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const st
                     sub.push_back(MenuItem::separator());
                     sub.push_back(MenuItem(fo::tr("Set Default"), "", nullptr, defaults));
                 }
-                m.push_back(MenuItem(fo::tr("Open With"), "", nullptr, sub));
+                m.push_back(MenuItem(fo::tr("Open with\xE2\x80\xA6"), "Ctrl+Shift+O", nullptr, sub).with_icon("external-link"));
             }
         }
         m.push_back(MenuItem(fo::tr("Preview"), "Space", [this, target, where] {
@@ -1375,60 +1374,62 @@ std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const st
             } else {
                 show_item(target);
             }
-        }));
+        }).with_icon("eye"));
         m.push_back(MenuItem::separator());
     }
     bool change = !trash_view && !recents;
     if (change && item && where == &model_ && query_.empty()) {
-        m.push_back(MenuItem(fo::tr("Rename\xE2\x80\xA6"), "F2", [this, target] {
+        m.push_back(MenuItem(fo::tr("Rename"), "F2", [this, target] {
             select_path(target);
             rename();
-        }));
-        m.push_back(MenuItem(fo::tr("Duplicate"), "Ctrl+Shift+D", [this, paths] { ops_->duplicate(paths); }));
+        }).with_icon("edit"));
+        m.push_back(MenuItem(fo::tr("Duplicate"), "", [this, paths] { ops_->duplicate(paths); }).with_icon("copy"));
     }
     if (item)
         m.push_back(MenuItem(fo::tr("Copy"), "Ctrl+C", [this, paths] {
             App::get().copy_files(paths, false);
             fo::Toast::show(win_, fo::trn("Copied %n items", int(paths.size())), 2);
-        }));
+        }).with_icon("copy"));
     if (item && change)
         m.push_back(MenuItem(fo::tr("Cut"), "Ctrl+X", [this, paths] {
             App::get().copy_files(paths, true);
             fo::Toast::show(win_, fo::trn("Cut %n items", int(paths.size())), 2);
-        }));
+        }).with_icon("cut"));
     if (change && (!item || for_folder)) {
         std::string into = item ? target : folder;
-        m.push_back(MenuItem(for_folder ? fo::tr("Paste Into Folder") : fo::tr("Paste"), item ? "" : "Ctrl+V",
-                             [this, into] { paste(into); }));
+        m.push_back(MenuItem(for_folder ? fo::tr("Paste into folder") : fo::tr("Paste"), item ? "" : "Ctrl+V",
+                             [this, into] { paste(into); }).with_icon("paste"));
     }
-    m.push_back(MenuItem(fo::tr("Copy Path"), "Ctrl+Shift+C", [this, paths, folder] {
+    m.push_back(MenuItem(fo::tr("Copy path"), "Ctrl+Alt+C", [this, paths, folder] {
         std::vector<std::string> ps = paths.empty() ? std::vector<std::string>{folder} : paths;
         std::string text;
         for (const auto &p : ps)
             text += (text.empty() ? "" : "\n") + p;
         App::get().copy_text(text);
         fo::Toast::show(win_, fo::tr("Copied the path"), 2);
-    }));
+    }).with_icon("link"));
     if (!item && change)
-        m.push_back(MenuItem(fo::tr("New Folder"), "Ctrl+Shift+N", [this, folder] { ops_->new_folder(folder); }));
+        m.push_back(MenuItem(fo::tr("Create folder"), "F7", [this, folder] { ops_->new_folder(folder); }).with_icon("folder-plus"));
+    if (!item && change)
+        m.push_back(MenuItem(fo::tr("Create file"), "Ctrl+N", [this] { new_file(); }).with_icon("file"));
     m.push_back(MenuItem::separator());
     if (item && change) {
-        m.push_back(MenuItem(fo::tr("Compress"), "", [this, paths] { ops_->compress(paths); }));
+        m.push_back(MenuItem(fo::tr("Compress"), "", [this, paths] { ops_->compress(paths); }).with_icon("compress"));
         if (e.kind == Kind::Archive && !e.is_dir)
-            m.push_back(MenuItem(fo::tr("Extract Here"), "", [this, target] { extract(target); }));
+            m.push_back(MenuItem(fo::tr("Extract here"), "", [this, target] { extract(target); }).with_icon("extract"));
         auto share = share_menu(paths, target);
         if (!share.empty())
-            m.push_back(MenuItem(fo::tr("Share"), "", nullptr, share));
+            m.push_back(MenuItem(fo::tr("Share"), "", nullptr, share).with_icon("share"));
     }
     if (for_folder && !trash_view)
         m.push_back(MenuItem(places::is_pinned(target) ? fo::tr("Unpin") : fo::tr("Pin"), "Ctrl+D",
                              [this, target] { toggle_pin(target); }));
     if ((!item && !recents) || for_folder) {
         std::string dir = item ? target : folder;
-        m.push_back(MenuItem(fo::tr("Open Terminal Here"), "", [this, dir] {
+        m.push_back(MenuItem(fo::tr("Terminal here"), "Ctrl+.", [this, dir] {
             if (!open_terminal(dir))
                 show_message(fo::tr("No terminal was found."));
-        }));
+        }).with_icon("terminal"));
     }
     if (!item)
         m.push_back(MenuItem(hidden_ ? fo::tr("Hide Hidden Files") : fo::tr("Show Hidden Files"), "Ctrl+H",
@@ -1442,8 +1443,8 @@ std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const st
         if (trash_view)
             m.push_back(MenuItem(fo::tr("Delete Permanently\xE2\x80\xA6"), "Delete", [this, paths] { confirm_delete(paths); }));
         else
-            m.push_back(MenuItem(n > 1 ? fo::trn("Delete %n Items", n) : fo::tr("Delete"), "Delete",
-                                 [this, paths] { ops_->trash(paths); }));
+            m.push_back(MenuItem(n > 1 ? fo::trn("Send %n items to Trash", n) : fo::tr("Send to Trash"), "Delete",
+                                 [this, paths] { ops_->trash(paths); }).with_icon("trash"));
     }
     // No separator at the ends or twice in a row.
     std::vector<MenuItem> out;

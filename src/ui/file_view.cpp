@@ -154,11 +154,13 @@ void FileView::mode(Mode m) {
     mode_ = m;
     switch (m) {
     case Mode::Groups:
+        always_ring(true);
         layout(Layout::Bands);
         padding(0);
         ring_radius(11);
         break;
     case Mode::Grid:
+        always_ring(true);
         layout(Layout::Grid);
         tile_size(kCellW, kCellH);
         padding(0);
@@ -166,6 +168,7 @@ void FileView::mode(Mode m) {
         break;
     case Mode::List:
     case Mode::Dual:
+        always_ring(true);
         layout(Layout::List);
         row_height(m == Mode::Dual ? 32 : kRowH);
         padding(0);
@@ -176,6 +179,7 @@ void FileView::mode(Mode m) {
         row_height(32);
         padding(4);
         ring_radius(7);
+        always_ring(false); // only the column with the keyboard shows it
         break;
     }
     redraw();

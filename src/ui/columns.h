@@ -1,4 +1,4 @@
-// Columns, as in the macOS Finder (Folio's FolderColumns): the folders on
+// Columns, as in the macOS Finder (Files' Columns view): the folders on
 // the way here from the root (~, a mounted machine, or /), the current
 // folder, and what's inside the selected subfolder. Built from FileViews
 // side by side; the newest columns stay in view as the trail grows.
@@ -20,7 +20,7 @@ class Pane;
 
 class ColumnsView : public Fl_Group {
 public:
-    static constexpr int kColumn = 260;
+    static constexpr int kColumn = 230; // Files' column width
 
     ColumnsView(int x, int y, int w, int h, Pane *pane);
     ~ColumnsView() override;
