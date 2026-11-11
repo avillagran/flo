@@ -1,4 +1,5 @@
 #include "core/places.h"
+#include "core/network.h"
 #include "core/fsutil.h"
 #include "core/gmain_thread.h"
 #include "core/natural_sort.h"
@@ -300,11 +301,35 @@ struct Devices::Impl {
                     // Mounted: already listed from the mount table; mark ejectable.
                     GFile *root = g_mount_get_root(m);
                     if (char *path = g_file_get_path(root)) {
+                        bool listed = false;
                         for (auto &p : list)
                             if (p.path == path) {
                                 p.can_eject = g_mount_can_eject(m);
                                 p.can_unmount = g_mount_can_unmount(m);
+                                listed = true;
                             }
+                        // A phone or camera (MTP, gphoto2) mounted by GVfs
+                        // isn't in the mount table: keep it listed, at its
+                        // GVfs path, so it can be opened and ejected.
+                        GDrive *drive = g_volume_get_drive(v);
+                        const bool removable =
+                            drive && (g_drive_is_removable(drive) || g_drive_is_media_removable(drive));
+                        if (drive)
+                            g_object_unref(drive);
+                        if (!listed && (removable || !drive) && !gvfs_root().empty() &&
+                            path_inside(path, gvfs_root())) {
+                            Place p;
+                            char *name = g_volume_get_name(v);
+                            p.name = name ? name : path_basename(path);
+                            g_free(name);
+                            p.path = path;
+                            p.id = path;
+                            p.icon = "removable";
+                            p.removable = true;
+                            p.can_eject = g_mount_can_eject(m);
+                            p.can_unmount = g_mount_can_unmount(m);
+                            list.push_back(std::move(p));
+                        }
                         g_free(path);
                     }
                     g_object_unref(root);
