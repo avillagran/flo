@@ -67,22 +67,32 @@ preview, trash, undo toast, empty folder, shortcuts overlay.
 ## Memory
 
 PSS and RSS from `/proc/PID/smaps_rollup` (`tools/measure-mem.sh`), after
-10+ seconds idle, release build, FLTK linked statically, in a private Xvfb
+30 seconds idle, release build, FLTK linked statically, in a private Xvfb
 (1280x800 window, X11 backend, no session bus), with a folder of 50 photos
-(1600x1200 JPEG) open in the grid with the details pane:
+(1600x1200 JPEG) open in the grid with the details pane. Measured
+2026-11-11 with folder peeks, remembered listings and all 50 translation
+catalogs in the binary:
 
 | State | flo PSS | flo RSS |
 |---|---|---|
-| Folder open, first screen of thumbnails, cold cache | 15.7 MiB | 30.5 MiB |
-| Same, restarted with a warm thumbnail cache | 15.4 MiB | 30.2 MiB |
-| After scrolling through all 50 thumbnails | 19.2 MiB | 34.0 MiB |
+| Folder open, first screen of thumbnails, cold cache | 16.1 MiB | 31.1 MiB |
+| Same, restarted with a warm thumbnail cache | 15.5 MiB | 30.1 MiB |
+| After scrolling through all 50 thumbnails | 20.7 MiB | 36.1 MiB |
+
+The previous release (eeac41a), measured in the same session for
+comparison, gave 16.2 MiB and 20.7 MiB for the first and third rows (its
+earlier 15.7 and 19.2 MiB were taken on a different day): the new
+features cost about 0.3 to 0.5 MiB, and a fixed malloc mmap threshold
+(decoded thumbnails no longer fragment the heap) wins back about 0.7 MiB.
+Scaled thumbnails are capped at 4 MiB (about 115 tiles), so a bigger
+folder of photos doesn't grow past that.
 
 Reported separately (child processes, gone when idle):
 
 | Process | PSS | RSS |
 |---|---|---|
-| `flo-thumbnailer` worker, while making thumbnails (up to 4; exit after 20 s idle) | ~1.0 MiB each | ~7.7 MiB each |
-| `flo preview` showing a 1600x1200 photo (exits when closed) | 24.0 MiB | 40.1 MiB |
+| `flo-thumbnailer` worker, while making thumbnails (up to 4; exit after 20 s idle) | ~1.0 MiB each | ~7.9 MiB each |
+| `flo preview` showing a 1600x1200 photo (exits when closed) | 23.7 MiB | 40.5 MiB |
 
 For reference: the Rust predecessor measured 19 MiB, a bare FLTK window
 about 9 MiB.

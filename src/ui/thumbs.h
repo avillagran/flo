@@ -4,8 +4,9 @@
 // or 1024 px); this cache decodes it once, scales it straight to the box it
 // is drawn in (a 128x92 tile, a 20 px list icon, the details pane) at the
 // screen's real resolution, and keeps only that. The decoded thumbnail is
-// dropped at once, and the scaled images are bounded by bytes (LRU), so a
-// folder of photos costs a few MiB however many thumbnails it has.
+// dropped at once, and the scaled images are bounded by bytes (LRU, 4 MiB:
+// about 115 grid tiles, several screens), so a folder of photos costs a few
+// MiB however many thumbnails it has.
 #pragma once
 
 #include "core/entry.h"
@@ -27,7 +28,7 @@ namespace flo::ui {
 
 class ThumbImages {
 public:
-    explicit ThumbImages(ThumbnailService &service, std::size_t max_bytes = 8u << 20);
+    explicit ThumbImages(ThumbnailService &service, std::size_t max_bytes = 4u << 20);
     ~ThumbImages();
 
     // Whether thumbnails are worth asking for this entry (not folders, not

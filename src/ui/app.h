@@ -24,6 +24,9 @@ namespace flo::ui {
 class MainWindow;
 class ThumbImages;
 
+// Keeps big short-lived buffers out of the heap (the window and the preview).
+void tune_malloc();
+
 // The sidebar's data, shared by every window.
 struct PlacesData {
     std::string home;

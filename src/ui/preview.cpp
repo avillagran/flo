@@ -17,6 +17,7 @@
 #include "core/fsutil.h"
 #include "core/lister.h"
 #include "core/thumbnail_service.h"
+#include "ui/app.h"
 #include "ui/details.h"
 #include "ui/file_view.h"
 #include "ui/strings.h"
@@ -541,6 +542,7 @@ int run_preview(int argc, char **argv) {
         std::fprintf(stderr, "flo preview: no such file\n");
         return 2;
     }
+    ui::tune_malloc();
     ui::register_catalogs();
     fo::InitOptions opts;
     opts.app_class = "flo-preview";
