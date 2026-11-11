@@ -1,4 +1,5 @@
 #include "ui/app.h"
+#include "ui/sizes.h"
 
 #include "core/clipboard.h"
 #include "core/fsutil.h"
@@ -283,6 +284,11 @@ int App::run(const std::string &folder, const std::string &select) {
     Fl::add_fd(queue_->fd(), FL_READ, [](int, void *q) { static_cast<EventQueue *>(q)->dispatch(); }, queue_.get());
     thumb_service_ = std::make_unique<ThumbnailService>(*queue_);
     thumbs_ = std::make_unique<ThumbImages>(*thumb_service_);
+    sizes_ = std::make_unique<FolderSizes>(*queue_);
+    sizes_->on_result([this](const std::string &) {
+        for (MainWindow *w : windows_)
+            w->sizes_changed();
+    });
     watcher_ = std::make_unique<Watcher>(*queue_);
     devices_ = std::make_unique<Devices>(*queue_);
     network_ = std::make_unique<Network>(*queue_);
@@ -331,6 +337,7 @@ int App::run(const std::string &folder, const std::string &select) {
     save_settings();
     // Services stop before the queue goes.
     dbus_.reset();
+    sizes_.reset();
     thumbs_.reset();
     thumb_service_.reset();
     devices_.reset();

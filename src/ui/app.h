@@ -23,6 +23,7 @@ namespace flo::ui {
 
 class MainWindow;
 class ThumbImages;
+class FolderSizes;
 
 // Keeps big short-lived buffers out of the heap (the window and the preview).
 void tune_malloc();
@@ -68,6 +69,8 @@ public:
     EventQueue &queue() { return *queue_; }
     ThumbnailService &thumbnail_service() { return *thumb_service_; }
     ThumbImages &thumbs() { return *thumbs_; }
+    // Folder sizes (Files' automatic sizes and Recalculate).
+    FolderSizes &sizes() { return *sizes_; }
     Watcher &watcher() { return *watcher_; }
     Devices &devices() { return *devices_; }
     Network &network() { return *network_; }
@@ -107,6 +110,7 @@ private:
     std::unique_ptr<EventQueue> queue_;
     std::unique_ptr<ThumbnailService> thumb_service_;
     std::unique_ptr<ThumbImages> thumbs_;
+    std::unique_ptr<FolderSizes> sizes_;
     std::unique_ptr<Watcher> watcher_;
     std::unique_ptr<Devices> devices_;
     std::unique_ptr<Network> network_;

@@ -1,7 +1,9 @@
-// One folder pane (Folio's FolderPane): its path bar, a banner for problems
-// and slow work, and the files in a grid, a list or columns. Each pane has
-// its own folder, history, selection, search, file operations (with undo)
-// and mounts. A window has one, or two side by side.
+// One folder pane: a tab of a Files window, or the second pane of the dual
+// view (F9). It shows a folder in Groups, List, Grid, Columns or Space,
+// with a banner for problems and slow work. Each pane has its own folder,
+// history, selection, filter, search, file operations (with undo) and
+// mounts. The window's header (path chips, the omnibar, the view buttons)
+// and the inspector follow the pane used last.
 #pragma once
 
 #include "core/entry.h"
@@ -21,11 +23,11 @@
 #include <string>
 #include <vector>
 
+#include "fltk-omarchy/shell.h"
+
 namespace fo {
-class Breadcrumbs;
 class Button;
 class IconButton;
-class TextField;
 struct MenuItem;
 } // namespace fo
 
@@ -34,56 +36,33 @@ namespace flo::ui {
 class MainWindow;
 class FileView;
 class ColumnsView;
+class SpaceView;
 class Pane;
-
-// The pane's part of the top bar: breadcrumbs (or the path being typed, or
-// the search), then the view, sort, hidden-files and details buttons.
-class PathBar : public Fl_Group {
-public:
-    PathBar(int x, int y, int w, int h, Pane *pane);
-    void update(); // folder, view, sort, toggles
-    void edit_path();
-    void stop_editing(bool refocus = true);
-    void search();
-    void end_search(bool refocus = true);
-    bool editing() const { return editing_; }
-    bool searching() const;
-    bool search_focused() const;
-    void closable(bool on);
-    void resize(int x, int y, int w, int h) override;
-    void draw() override;
-    void set_active_marker(bool on) { marker_ = on; redraw(); }
-    void relabel(); // the language changed
-
-    fo::Breadcrumbs *crumbs = nullptr;
-    fo::TextField *path_field = nullptr, *search_field = nullptr;
-    fo::IconButton *view_b = nullptr, *sort_b = nullptr, *hidden_b = nullptr, *details_b = nullptr, *close_b = nullptr;
-
-private:
-    static void search_timer(void *);
-    void place();
-    Pane *pane_;
-    bool editing_ = false, closable_ = false, marker_ = false;
-};
 
 class Pane : public Fl_Group {
 public:
-    enum class View { Grid, List, Columns };
+    // Files' views: Ctrl+1 Groups, 2 List, 3 Columns, 4 Space, 5 Grid.
+    enum class View { Groups, List, Columns, Space, Grid };
 
     Pane(MainWindow *win, int x, int y, int w, int h, const std::string &folder, View view);
     ~Pane() override;
 
     MainWindow *win() const { return win_; }
-    PathBar *bar() const { return bar_; }
     const std::string &folder() const { return folder_; }
     FolderModel &model() { return model_; }
     const FolderModel &model() const { return model_; }
     View view() const { return view_; }
     void set_view(View v);
-    void cycle_view();
+    // The second pane of the dual view: compact rows and its own small
+    // header (folder · path), whatever its view.
+    void dual(bool on);
+    bool is_dual() const { return dual_; }
     FileView *files() const; // the view holding the selection
     const std::vector<std::pair<std::string, std::string>> &crumbs() const { return crumbs_; }
     std::string title() const;
+    bool can_back() const { return !back_.empty(); }
+    bool can_forward() const { return !forward_.empty(); }
+    bool can_go_up() const;
 
     // Going places.
     void navigate(const std::string &path, const std::string &select = {}, bool history = true);
@@ -123,9 +102,27 @@ public:
     void undo();
     void redo();
     void toggle_hidden();
-    void step_sort(int by);
     void set_sort(SortMode m);
     void sort_menu();
+    // Files' selection tools.
+    void invert_selection();
+    void clear_selection();
+    void select_all();
+    void mark_and_advance(); // Insert
+    void select_filtered();  // Ctrl+Shift+A: mark the matches, show everything
+    // Ctrl+N: an empty file (never overwriting).
+    void new_file();
+    // F5 / F6: copy or move what is selected to `folder` (asked when empty;
+    // the other pane's folder in the dual view).
+    void transfer(bool move, const std::string &folder = {});
+    // Ctrl+Space: measure the focused folder again; Ctrl+Shift+Space: all
+    // the listed folders.
+    void measure_focused();
+    void measure_listed();
+    // Type-to-filter (Files): only the names matching `text` show.
+    void set_filter(const std::string &text);
+    const std::string &filter() const { return filter_; }
+    int unfiltered_count() const { return filter_.empty() ? model_.count() : int(all_.size()); }
     void toggle_pin(const std::string &path = {});
     void preview();
     void context_menu(int index, int x, int y, FolderModel *where = nullptr, const std::string &folder = {});
@@ -141,14 +138,20 @@ public:
     void drop_into(const std::vector<std::string> &paths, const std::string &folder);
     void start_drag();
     bool escape();
+    // A recursive search below the folder (Ctrl+Shift+F); "" ends it.
     void set_query(const std::string &q);
     const std::string &query() const { return query_; }
+    bool searching() const { return searching_; }
 
     bool in_trash() const;
     bool in_recents() const { return folder_ == kRecents; }
     bool typing() const;
     bool show_hidden() const { return hidden_; }
     SortMode sort() const { return sort_; }
+
+    // What the status bar says about this pane ("2 marked · 54 items").
+    std::string status_text() const;
+    bool loading() const { return model_.loading; }
 
     void show_message(const std::string &text, bool error = true);
     void dismiss_message();
@@ -177,7 +180,12 @@ private:
     void op_conflict(const OpConflict &c);
     void ask_mount(const MountRequest &r);
     void place_children();
+    void order_for_view(); // Groups: folders, then files by age section
+    void request_sizes();
+    void sort_clicked(int column);
+    std::vector<fo::SortHeader::Column> list_header_columns() const;
     int banner_height() const;
+    int header_height() const;
     std::string banner_text(bool &error, bool &progress) const;
     void wire(FileView *v);
     std::vector<fo::MenuItem> menu_for(int index, FolderModel *where, const std::string &folder);
@@ -188,16 +196,20 @@ private:
                   std::function<void(const ProcessResult &)> done);
 
     MainWindow *win_;
-    PathBar *bar_;
-    FileView *grid_ = nullptr; // grid and list
+    FileView *grid_ = nullptr; // groups, list, grid
     ColumnsView *columns_ = nullptr;
+    SpaceView *space_ = nullptr;
+    fo::SortHeader *list_header_ = nullptr;
     fo::IconButton *dismiss_ = nullptr;
     fo::Button *cancel_ = nullptr, *empty_trash_ = nullptr;
 
     std::string folder_;
     FolderModel model_;
-    View view_ = View::Grid;
+    View view_ = View::Groups;
+    bool dual_ = false;
     bool hidden_ = false;
+    std::string filter_;
+    std::vector<Entry> all_; // the whole listing while a filter shows part of it
     SortMode sort_ = SortMode::Name;
     std::vector<std::string> back_, forward_;
     std::vector<std::pair<std::string, std::string>> crumbs_; // label, path

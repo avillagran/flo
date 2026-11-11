@@ -5,7 +5,10 @@
 #include "ui/app.h"
 #include "ui/file_view.h"
 #include "ui/pane.h"
+#include "ui/sizes.h"
 #include "ui/thumbs.h"
+
+#include "core/tree_size.h"
 
 #include "fltk-omarchy/i18n.h"
 #include "fltk-omarchy/icons.h"
@@ -95,28 +98,14 @@ std::string image_dimensions(const std::string &path) {
 
 DetailsPane::DetailsPane(int x, int y, int w, int h) : Fl_Group(x, y, w, h) {
     box(FL_NO_BOX);
-    open_ = new fo::Button(x + kPad, y + h - kPad - 40, w - 2 * kPad, 40, nullptr);
-    open_->primary(true);
-    open_->clear_visible_focus();
-    open_->hide();
     end();
     resizable(nullptr);
-    open_->on_click([this] {
-        if (!pane_ || !has_)
-            return;
-        if (trashed_)
-            pane_->restore({path_});
-        else
-            pane_->open_path(path_);
-    });
+    clear_visible_focus();
 }
 
 DetailsPane::~DetailsPane() = default;
 
-void DetailsPane::resize(int X, int Y, int W, int H) {
-    Fl_Widget::resize(X, Y, W, H);
-    open_->resize(X + kPad, Y + H - kPad - 40, std::max(40, W - 2 * kPad), 40);
-}
+void DetailsPane::resize(int X, int Y, int W, int H) { Fl_Widget::resize(X, Y, W, H); }
 
 void DetailsPane::relabel() {
     path_.clear();
@@ -128,20 +117,14 @@ void DetailsPane::show_from(Pane *pane) {
     pane_ = pane;
     const Entry *e = pane && visible_r() ? pane->current_entry() : nullptr;
     std::string path = e ? pane->current_path() : std::string();
-    if (e && path == path_ && has_ && e->mtime_ns == entry_.mtime_ns && e->item_count == entry_.item_count)
-        return;
     has_ = e != nullptr;
+    bool same = has_ && path == path_ && e->mtime_ns == entry_.mtime_ns;
     path_ = path;
     if (e)
         entry_ = *e;
     trashed_ = has_ && in_trash_folder(path_) && path_dirname(path_) == trash::home_trash() + "/files";
-    if (has_) {
-        open_->copy_label(trashed_ ? fo::tr("Restore") : entry_.is_dir ? fo::tr("Open folder") : fo::tr("Open"));
-        open_->show();
-    } else {
-        open_->hide();
-    }
-    describe();
+    if (!same)
+        describe();
     redraw();
 }
 
@@ -181,103 +164,199 @@ void DetailsPane::describe() {
         });
 }
 
+// Files' inspector (view.rs inspector()): positions follow the window's
+// height the way Files' do; the buttons are drawn and hit here.
+void DetailsPane::buttons(std::vector<Btn> &out) const {
+    out.clear();
+    if (!has_)
+        return;
+    const int iw = w(), x0 = x(), bottom = y() + h();
+    const int ph = std::max(38, std::min(98, (h() + 122 - 424) / 2));
+    const int title_y = y() + 62 + ph;
+    if (entry_.is_dir && title_y + 164 - y() <= h() - 52) {
+        std::string label;
+        if (App::get().sizes().pending(path_))
+            label = fo::tr("Calculating\xE2\x80\xA6");
+        else if (App::get().sizes().get(path_))
+            label = std::string(fo::tr("Recalculate")) + " \xC2\xB7 Ctrl+Space";
+        else
+            label = std::string(fo::tr("Calculate")) + " \xC2\xB7 Ctrl+Space";
+        out.push_back({x0 + 16, title_y + 130, iw - 32, 30, "calculator", label, false, Act::Measure});
+    }
+    out.push_back({x0 + 16, bottom - 136, iw - 32, 30, "edit", std::string(fo::tr("Rename")) + " \xC2\xB7 F2", false, Act::Rename});
+    int half = (iw - 40) / 2;
+    out.push_back({x0 + 16, bottom - 94, half, 34, "", trashed_ ? fo::tr("Restore") : fo::tr("Open"), true, Act::Open});
+    out.push_back({x0 + 24 + half, bottom - 94, half, 34, "image", fo::tr("Preview"), false, Act::Preview});
+    out.push_back({x0 + 16, bottom - 52, 60, 34, "link", "", false, Act::CopyPath});
+    out.push_back({x0 + 80, bottom - 52, 68, 34, "copy", "F5", false, Act::Copy});
+    out.push_back({x0 + 152, bottom - 52, 68, 34, "arrow-right", "F6", false, Act::Move});
+}
+
+int DetailsPane::handle(int event) {
+    std::vector<Btn> bs;
+    buttons(bs);
+    int ex = Fl::event_x(), ey = Fl::event_y();
+    int at = -1;
+    for (size_t i = 0; i < bs.size(); ++i)
+        if (ex >= bs[i].x && ex < bs[i].x + bs[i].w && ey >= bs[i].y && ey < bs[i].y + bs[i].h)
+            at = int(i);
+    switch (event) {
+    case FL_ENTER:
+    case FL_MOVE:
+        if (at != hover_) {
+            hover_ = at;
+            redraw();
+        }
+        return 1;
+    case FL_LEAVE:
+        hover_ = -1;
+        redraw();
+        return 1;
+    case FL_PUSH:
+        return at >= 0 ? 1 : 0;
+    case FL_RELEASE: {
+        if (at < 0 || !pane_ || !has_)
+            return 1;
+        Pane *p = pane_;
+        std::string path = path_;
+        switch (bs[size_t(at)].act) {
+        case Act::Measure: p->measure_focused(); break;
+        case Act::Rename: p->rename(); break;
+        case Act::Open:
+            if (trashed_)
+                p->restore({path});
+            else
+                p->open_path(path);
+            break;
+        case Act::Preview: p->preview(); break;
+        case Act::CopyPath: p->copy_path(); break;
+        case Act::Copy: p->transfer(false); break;
+        case Act::Move: p->transfer(true); break;
+        }
+        return 1;
+    }
+    }
+    return 0;
+}
+
 void DetailsPane::draw() {
     const fo::Theme &t = fo::theme();
-    auto hint = [&] {
-        // The Enter hint inside the button, as Folio has it.
-        if (open_->visible())
-            fo::text::draw("\xE2\x8F\x8E", open_->x(), open_->y(), open_->w() - 14, open_->h(),
-                           t.accent_foreground(), fo::text::REGULAR, fo::text::size::BODY, FL_ALIGN_RIGHT);
-    };
-    if (!(damage() & ~FL_DAMAGE_CHILD)) {
-        draw_children(); // the button's hover
-        hint();
-        return;
-    }
-    fo::paint::fill(x(), y(), w(), h(), t.dark_background());
-    fo::paint::vline(x(), y(), h(), t.hairline());
+    fo::paint::fill(x(), y(), w(), h(), t.background());
+    fo::paint::vline(x(), y(), h(), t.card());
+    fo::text::draw(fo::tr("INSPECTOR"), x() + 16, y() + 12, w() - 32, 22, t.dim(), fo::text::REGULAR, 10);
     if (!has_) {
-        fo::text::draw(fo::tr("Nothing selected"), x(), y(), w(), h(), t.secondary_foreground(), fo::text::REGULAR,
-                       fo::text::size::BODY, FL_ALIGN_CENTER);
+        fo::text::draw(fo::tr("Select an item"), x() + 16, y() + 52, w() - 32, 28, t.dim(), fo::text::REGULAR, 12);
         return;
     }
-    fl_push_clip(x() + 1, y(), w() - 1, h());
-    const int iw = w() - 2 * kPad, ix = x() + kPad;
-    int yy = y() + kPad;
-    const int ph = iw * 3 / 4;
-    // The large look.
+    fl_push_clip(x() + 8, y() + 8, w() - 16, h() - 16);
+    const int iw = w() - 32, ix = x() + 16;
+    const int ph = std::max(38, std::min(98, (h() + 122 - 424) / 2));
+    const int ty = y() + 50, title_y = y() + 62 + ph;
+    const int r = t.radius() > 0 ? 7 : 0;
     const Facts &f = *facts_;
-    if (entry_.kind == Kind::Text && !entry_.is_dir) {
-        fo::paint::fill(ix, yy, iw, ph, t.background());
-        fo::paint::round_frame(ix, yy, iw, ph, 0, 1, t.hairline());
-        if (f.ready && !f.text.empty()) {
-            fl_push_clip(ix + 14, yy + 14, iw - 28, ph - 28);
-            fl_font(FL_COURIER, 10);
-            fl_color(t.foreground().fl());
-            int ly = yy + 14 + fl_height() - fl_descent();
-            size_t pos = 0;
-            while (pos < f.text.size() && ly < yy + ph) {
-                size_t nl = f.text.find('\n', pos);
-                std::string line = f.text.substr(pos, nl == std::string::npos ? std::string::npos : nl - pos);
-                for (auto &c : line)
-                    if (c == '\t')
-                        c = ' ';
-                fl_draw(line.c_str(), ix + 14, ly);
-                ly += fl_height();
-                if (nl == std::string::npos)
-                    break;
-                pos = nl + 1;
-            }
-            fl_pop_clip();
+    // The preview tile.
+    fo::paint::round_fill(ix, ty, iw, ph, r, t.card());
+    Fl_RGB_Image *img = nullptr;
+    if (!entry_.is_dir && App::get().settings().thumbnails)
+        img = App::get().thumbs().get(path_, entry_, 256, iw, ph, false, this);
+    if (img) {
+        img->draw(ix + (iw - img->w()) / 2, ty + (ph - img->h()) / 2);
+    } else if (entry_.is_dir) {
+        fo::icon::draw("folder", ix + iw / 2 - 12, ty + ph / 2 - 12, 25, t.blue());
+    } else if (entry_.kind == Kind::Text && f.ready && !f.text.empty()) {
+        fl_push_clip(ix + 8, ty + 6, iw - 16, ph - 12);
+        fl_font(FL_COURIER, 9);
+        fl_color(t.foreground().fl());
+        int ly = ty + 6 + fl_height() - fl_descent();
+        size_t pos = 0;
+        while (pos < f.text.size() && ly < ty + ph) {
+            size_t nl = f.text.find('\n', pos);
+            std::string line = f.text.substr(pos, nl == std::string::npos ? std::string::npos : nl - pos);
+            for (auto &c : line)
+                if (c == '\t')
+                    c = ' ';
+            fl_draw(line.c_str(), ix + 8, ly);
+            ly += fl_height();
+            if (nl == std::string::npos)
+                break;
+            pos = nl + 1;
         }
+        fl_pop_clip();
     } else {
-        Fl_RGB_Image *img = entry_.is_dir ? nullptr : App::get().thumbs().get(path_, entry_, 512, iw, ph, false, this);
-        if (img) {
-            img->draw(ix + (iw - img->w()) / 2, yy + (ph - img->h()) / 2);
-        } else if (entry_.is_dir) {
-            draw_folder_card(ix + iw / 2 - 64, yy + ph / 2 - 46, 128, 92, t.lighter_background(), t.accent(), 0);
-        } else {
-            fo::paint::fill(ix, yy, iw, ph, t.background());
-            fo::icon::draw(kind_icon(entry_), ix + iw / 2 - 36, yy + ph / 2 - 36, 72, kind_color(entry_), 1.2);
+        int bx = ix + iw / 2 - 24, by = ty + (ph - 48) / 2;
+        fo::paint::round_fill(bx, by, 48, 48, r ? 10 : 0, badge_color(entry_));
+        std::string ext = entry_.extension();
+        fo::text::draw(ext.empty() ? "FILE" : ext.substr(0, 5), bx + 2, by, 44, 48, t.background(), fo::text::BOLD, 14,
+                       FL_ALIGN_CENTER, fo::text::Elide::None);
+    }
+    // Name, kind and the facts.
+    fo::text::draw(display_name(entry_), ix, title_y, iw, 36, t.bright_foreground(), fo::text::REGULAR, 13,
+                   FL_ALIGN_LEFT, fo::text::Elide::Middle);
+    std::string kind = entry_.is_link && !entry_.link_target.empty()
+                           ? fo::i18n::arg(fo::tr("Link \xE2\x86\x92 %1"), entry_.link_target)
+                           : entry_.is_dir ? fo::tr("Folder") : std::string(entry_.mime ? entry_.mime : "");
+    fo::text::draw(kind, ix, title_y + 44, iw, 22, t.dim(), fo::text::REGULAR, 11, FL_ALIGN_LEFT,
+                   fo::text::Elide::Middle);
+    int line_y = title_y + 72;
+    if (entry_.is_dir) {
+        const FolderSizes::Result *sz = App::get().sizes().get(path_);
+        std::string total = sz ? fo::i18n::arg(fo::tr("Total: %1"), si_size(sz->bytes)) : fo::tr("Size not calculated");
+        fo::text::draw(total, ix, line_y, iw, 22, t.foreground(), fo::text::REGULAR, 11);
+        std::string count;
+        if (sz)
+            count = fo::trn("%n entries", int(sz->files + sz->folders)) + " \xC2\xB7 " + relative_when(entry_.mtime_ns);
+        else if (entry_.item_count >= 0)
+            count = fo::trn("%n entries", entry_.item_count) + " \xC2\xB7 " + relative_when(entry_.mtime_ns);
+        else
+            count = fo::tr("Does not follow links");
+        fo::text::draw(count, ix, line_y + 26, iw, 22, t.dim(), fo::text::REGULAR, 11);
+    } else {
+        fo::text::draw(fo::tr("Size"), ix, line_y, 80, 22, t.foreground(), fo::text::REGULAR, 12);
+        fo::text::draw(si_size(uint64_t(std::max<int64_t>(0, entry_.size))), ix + 80, line_y, iw - 80, 22,
+                       t.foreground(), fo::text::REGULAR, 12);
+        fo::text::draw(relative_when(entry_.mtime_ns), ix, line_y + 26, iw, 22, t.foreground(), fo::text::REGULAR,
+                       12);
+        int fy = line_y + 52;
+        auto fact = [&](const std::string &label, const std::string &value) {
+            if (value.empty() || fy + 22 > y() + h() - 176)
+                return;
+            fo::text::draw(label, ix, fy, 80, 20, t.dim(), fo::text::REGULAR, 11);
+            fo::text::draw(value, ix + 80, fy, iw - 80, 20, t.foreground(), fo::text::REGULAR, 11, FL_ALIGN_LEFT,
+                           fo::text::Elide::Middle);
+            fy += 22;
+        };
+        fact(fo::tr("Pixels"), f.dimensions);
+        if (trashed_) {
+            fact(fo::tr("From"), f.origin.empty() ? std::string() : tilde(path_dirname(f.origin)));
+            fact(fo::tr("Deleted"), f.deleted_at > 0 ? fo::i18n::format_date(std::time_t(f.deleted_at)) : std::string());
         }
+        if (title_y + 164 - y() <= h() - 52 && fy <= line_y + 52)
+            fo::text::draw(fo::tr("Enter opens \xC2\xB7 Backspace goes up"), ix, title_y + 130, iw, 28, t.dim(),
+                           fo::text::REGULAR, 11);
     }
-    yy += ph + 22;
-    // Name and summary.
-    auto lines = fo::text::wrap(display_name(entry_), iw, fo::text::fltk_measure(fo::text::SEMIBOLD, 15), 3);
-    for (const auto &l : lines) {
-        fo::text::draw(l, ix, yy, iw, 20, t.bright_foreground(), fo::text::SEMIBOLD, 15, FL_ALIGN_LEFT,
-                       fo::text::Elide::None);
-        yy += 20;
-    }
-    std::string type = entry_.is_dir ? fo::tr("Folder") : type_description(entry_.mime);
-    std::string size = size_text(entry_);
-    std::string summary = type.empty() ? size : size.empty() ? type : type + " \xC2\xB7 " + size;
-    fo::text::draw(summary, ix, yy + 2, iw, 18, t.secondary_foreground(), fo::text::REGULAR, fo::text::size::LABEL);
-    yy += 22 + 22;
-    auto row = [&](const std::string &label, const std::string &value) {
-        if (value.empty())
-            return;
-        fo::text::draw(label, ix, yy, iw, 18, t.secondary_foreground(), fo::text::REGULAR, fo::text::size::LABEL);
-        int lw = int(fo::text::width(label, fo::text::REGULAR, fo::text::size::LABEL)) + 16;
-        fo::text::draw(value, ix + lw, yy, iw - lw, 18, t.foreground(), fo::text::REGULAR, fo::text::size::LABEL,
-                       FL_ALIGN_RIGHT, fo::text::Elide::Middle);
-        yy += 30;
-    };
-    if (trashed_) {
-        row(fo::tr("From"), f.origin.empty() ? std::string() : tilde(path_dirname(f.origin)));
-        row(fo::tr("Deleted"), f.deleted_at > 0 ? fo::i18n::format_date(std::time_t(f.deleted_at)) + " " +
-                                                      fo::i18n::format_time(std::time_t(f.deleted_at))
-                                                : std::string());
-    } else {
-        std::time_t m = std::time_t(entry_.mtime_ns / 1000000000);
-        row(fo::tr("Modified"), m > 0 ? fo::i18n::format_date(m) + " " + fo::i18n::format_time(m) : std::string());
-    }
-    row(fo::tr("Dimensions"), f.dimensions);
-    if (entry_.is_link)
-        row(fo::tr("Points to"), entry_.link_target);
     fl_pop_clip();
-    draw_children();
-    hint();
+    std::vector<Btn> bs;
+    buttons(bs);
+    for (size_t i = 0; i < bs.size(); ++i) {
+        const Btn &b = bs[i];
+        bool hov = int(i) == hover_;
+        fo::Rgb fill = b.primary ? t.card() : hov ? fo::mix(t.background(), t.card(), 0.6) : t.background();
+        if (fill != t.background())
+            fo::paint::round_fill(b.x, b.y, b.w, b.h, r, fill);
+        fo::Rgb fg = b.primary ? t.accent() : hov ? t.foreground() : t.dim();
+        int lx = b.x + 10;
+        if (!b.icon.empty()) {
+            int iwid = b.label.empty() ? b.w : 0;
+            if (iwid)
+                fo::icon::draw(b.icon, b.x + (b.w - 12) / 2, b.y + (b.h - 12) / 2, 12, fg);
+            else {
+                fo::icon::draw(b.icon, lx, b.y + (b.h - 12) / 2, 12, fg);
+                lx += 18;
+            }
+        }
+        if (!b.label.empty())
+            fo::text::draw(b.label, lx, b.y, b.x + b.w - lx - 6, b.h, fg, fo::text::REGULAR, 12);
+    }
 }
 
 } // namespace flo::ui

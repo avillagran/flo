@@ -1,6 +1,8 @@
 #include "ui/pane.h"
 
 #include "core/fsutil.h"
+#include "core/name_filter.h"
+#include "core/tree_size.h"
 #include "core/network.h"
 #include "core/places.h"
 #include "core/recents.h"
@@ -11,6 +13,8 @@
 #include "ui/columns.h"
 #include "ui/file_view.h"
 #include "ui/main_window.h"
+#include "ui/sizes.h"
+#include "ui/space_view.h"
 
 #include "fltk-omarchy/dialog.h"
 #include "fltk-omarchy/i18n.h"
@@ -18,6 +22,7 @@
 #include "fltk-omarchy/menu.h"
 #include "fltk-omarchy/paint.h"
 #include "fltk-omarchy/process.h"
+#include "fltk-omarchy/shell.h"
 #include "fltk-omarchy/text.h"
 #include "fltk-omarchy/widgets.h"
 
@@ -28,234 +33,22 @@
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
+#include <ctime>
+
+#include <fcntl.h>
+#include <unistd.h>
 
 namespace flo::ui {
 
 namespace {
 
-const int kBanner = 40, kTrashBar = 48;
+const int kBanner = 40, kTrashBar = 48, kDualHeader = 28, kListHeader = 30;
 
 std::string quoted(const std::string &s) { return "\xE2\x80\x9C" + s + "\xE2\x80\x9D"; }
-
-const char *sort_icon(SortMode m) {
-    switch (m) {
-    case SortMode::Name: return "arrow-down-a-z";
-    case SortMode::Kind: return "layers";
-    case SortMode::Newest: return "clock";
-    case SortMode::Oldest: return "history";
-    case SortMode::Size: return "arrow-down-wide-narrow";
-    }
-    return "arrow-down-a-z";
-}
-
-std::string sort_tip(SortMode m) {
-    switch (m) {
-    case SortMode::Name: return fo::tr("Sorted by name (S)");
-    case SortMode::Kind: return fo::tr("Sorted by kind (S)");
-    case SortMode::Newest: return fo::tr("Newest first (S)");
-    case SortMode::Oldest: return fo::tr("Oldest first (S)");
-    case SortMode::Size: return fo::tr("Biggest first (S)");
-    }
-    return {};
-}
 
 const SortMode kSorts[] = {SortMode::Name, SortMode::Kind, SortMode::Newest, SortMode::Oldest, SortMode::Size};
 
 } // namespace
-
-// ===========================================================================
-// PathBar
-
-PathBar::PathBar(int x, int y, int w, int h, Pane *pane) : Fl_Group(x, y, w, h), pane_(pane) {
-    box(FL_NO_BOX);
-    crumbs = new fo::Breadcrumbs(x + 26, y, w - 220, h);
-    path_field = new fo::TextField(x + 20, y + 11, w - 240, 38);
-    search_field = new fo::TextField(x + 20, y + 11, w - 240, 38);
-    path_field->textsize(fo::text::size::TITLE);
-    search_field->textsize(fo::text::size::TITLE);
-    path_field->hide();
-    search_field->hide();
-    view_b = new fo::IconButton(0, y + 12, 36, 36, "layout-grid");
-    sort_b = new fo::IconButton(0, y + 12, 36, 36, "arrow-down-a-z");
-    hidden_b = new fo::IconButton(0, y + 12, 36, 36, "eye", "Show hidden files (Ctrl+H)");
-    details_b = new fo::IconButton(0, y + 12, 36, 36, "panel-right", "Details (Ctrl+I)");
-    close_b = new fo::IconButton(0, y + 12, 36, 36, "x", "Close this pane (Ctrl+W)");
-    close_b->hide();
-    end();
-    resizable(nullptr);
-    relabel();
-
-    crumbs->on_navigate([this](int i) {
-        const auto &segs = crumbs->segments();
-        if (i >= 0 && i < int(segs.size()) && i + 1 < int(segs.size()))
-            pane_->navigate(segs[size_t(i)].path);
-    });
-    view_b->on_click([this] { pane_->cycle_view(); });
-    sort_b->on_click([this] { pane_->sort_menu(); });
-    hidden_b->on_click([this] { pane_->toggle_hidden(); });
-    details_b->on_click([this] { pane_->win()->toggle_details(); });
-    close_b->on_click([this] { defer([w = pane_->win()] { w->close_split(); }); });
-
-    path_field->on_enter([this] {
-        if (pane_->go_typed(path_field->value()))
-            stop_editing();
-    });
-    path_field->on_escape([this] { stop_editing(); });
-    path_field->on_complete([this](const std::string &t) {
-        return complete_path(t, pane_->folder(), pane_->show_hidden());
-    });
-    search_field->on_change([this] {
-        Fl::remove_timeout(search_timer, this);
-        Fl::add_timeout(0.15, search_timer, this);
-    });
-    search_field->on_escape([this] { end_search(); });
-    auto to_results = [this] {
-        Fl::remove_timeout(search_timer, this);
-        std::string q = search_field->value();
-        pane_->set_query(q);
-        if (pane_->query().empty())
-            end_search();
-        else
-            pane_->focus_view();
-    };
-    search_field->on_enter(to_results);
-    search_field->on_key([to_results](int k) {
-        if (k == FL_Down) {
-            to_results();
-            return true;
-        }
-        return false;
-    });
-}
-
-void PathBar::relabel() {
-    hidden_b->tooltip_text(fo::tr("Show hidden files (Ctrl+H)"));
-    details_b->tooltip_text(fo::tr("Details (Ctrl+I)"));
-    close_b->tooltip_text(fo::tr("Close this pane (Ctrl+W)"));
-}
-
-void PathBar::search_timer(void *data) {
-    auto *b = static_cast<PathBar *>(data);
-    b->pane_->set_query(b->search_field->value());
-}
-
-void PathBar::closable(bool on) {
-    closable_ = on;
-    on ? close_b->show() : close_b->hide();
-    place();
-}
-
-bool PathBar::searching() const { return search_field->visible(); }
-bool PathBar::search_focused() const { return Fl::focus() == search_field; }
-
-void PathBar::update() {
-    std::vector<fo::Breadcrumbs::Segment> segs;
-    for (const auto &c : pane_->crumbs())
-        segs.push_back({c.first, c.second});
-    crumbs->segments(segs);
-    switch (pane_->view()) {
-    case Pane::View::Grid:
-        view_b->icon("layout-grid");
-        view_b->tooltip_text(fo::tr("Grid (Ctrl+1); click for list"));
-        break;
-    case Pane::View::List:
-        view_b->icon("list");
-        view_b->tooltip_text(fo::tr("List (Ctrl+2); click for columns"));
-        break;
-    case Pane::View::Columns:
-        view_b->icon("columns-3");
-        view_b->tooltip_text(fo::tr("Columns (Ctrl+3); click for grid"));
-        break;
-    }
-    sort_b->icon(sort_icon(pane_->sort()));
-    sort_b->tooltip_text(sort_tip(pane_->sort()));
-    hidden_b->icon(pane_->show_hidden() ? "eye" : "eye-off");
-    hidden_b->active_state(pane_->show_hidden());
-    details_b->active_state(pane_->win()->details_visible());
-    redraw();
-}
-
-void PathBar::edit_path() {
-    path_field->set_text(pane_->typed_path());
-    editing_ = true;
-    place();
-    path_field->take_focus();
-}
-
-void PathBar::stop_editing(bool refocus) {
-    if (!editing_)
-        return;
-    editing_ = false;
-    place();
-    if (refocus)
-        pane_->focus_view();
-}
-
-void PathBar::search() {
-    search_field->show();
-    place();
-    search_field->take_focus();
-    search_field->set_text(search_field->value());
-}
-
-void PathBar::end_search(bool refocus) {
-    Fl::remove_timeout(search_timer, this);
-    search_field->value("");
-    search_field->hide();
-    place();
-    if (!pane_->query().empty())
-        pane_->set_query("");
-    if (refocus)
-        pane_->focus_view();
-}
-
-void PathBar::place() {
-    int right = x() + w() - 20;
-    for (auto *b : {close_b, details_b, hidden_b, sort_b, view_b}) {
-        if (!b->visible())
-            continue;
-        right -= 36;
-        b->resize(right, y() + 12, 36, 36);
-        right -= 4;
-    }
-    int left = x() + 26, fw = std::max(80, right - 16 - left);
-    crumbs->resize(left, y(), fw, h());
-    path_field->resize(left - 6, y() + 11, fw + 6, 38);
-    search_field->resize(left - 6, y() + 11, fw + 6, 38);
-    if (editing_) {
-        path_field->show();
-        crumbs->hide();
-    } else {
-        path_field->hide();
-        search_field->visible() ? crumbs->hide() : crumbs->show();
-    }
-    redraw();
-}
-
-void PathBar::resize(int X, int Y, int W, int H) {
-    Fl_Widget::resize(X, Y, W, H);
-    place();
-}
-
-void PathBar::draw() {
-    const fo::Theme &t = fo::theme();
-    // Only a child changed: let it draw itself, keep the rest.
-    if (damage() & ~FL_DAMAGE_CHILD)
-        fo::paint::fill(x(), y(), w(), h(), t.background());
-    draw_children();
-    if (search_field->visible() && !editing_) {
-        std::string where = pane_->crumbs().empty() ? std::string() : pane_->crumbs().back().first;
-        std::string scope = fo::i18n::arg(fo::tr("Search %1 and below"), where);
-        int sw = int(fo::text::width(scope, fo::text::REGULAR, fo::text::size::LABEL)) + 2;
-        int tw = int(fo::text::width(search_field->value(), fo::text::REGULAR, fo::text::size::TITLE));
-        if (tw + sw + 48 < search_field->w())
-            fo::text::draw(scope, search_field->x() + search_field->w() - sw - 12, search_field->y(), sw,
-                           search_field->h(), t.secondary_foreground(), fo::text::REGULAR, fo::text::size::LABEL);
-    }
-    fo::paint::hline(x(), y() + h() - 1, w(), t.hairline());
-    if (marker_)
-        fo::paint::fill(pane_->x(), y() + h() - 2, pane_->w(), 2, t.accent());
-}
 
 // ===========================================================================
 // Pane
@@ -272,24 +65,22 @@ Pane::Pane(MainWindow *win, int x, int y, int w, int h, const std::string &folde
     cancel_->hide();
     empty_trash_ = new fo::Button(0, 0, 140, 32, nullptr);
     empty_trash_->hide();
+    list_header_ = new fo::SortHeader(x, y, w, kListHeader);
     grid_ = new FileView(x, y, w, h, &model_);
     columns_ = new ColumnsView(x, y, w, h, this);
+    space_ = new SpaceView(x, y, w, h, this);
     end();
     resizable(nullptr);
     wire(grid_);
     wire(columns_->here());
+    grid_->on_new_folder([this] { new_folder(); });
+    list_header_->on_sort([this](int c) { sort_clicked(c); });
     dismiss_->on_click([this] { dismiss_message(); });
     cancel_->on_click([this] {
         if (ops_ && progress_on_)
             ops_->cancel(progress_.op);
     });
     empty_trash_->on_click([this] { empty_trash(); });
-
-    // The path bar lives in the window's top bar (it may reach over the
-    // sidebar or the details column).
-    Fl_Group::current(nullptr);
-    bar_ = new PathBar(x, 0, w, MainWindow::kBar, this);
-    win->insert(*bar_, 0);
 
     lister_ = std::make_unique<Lister>(app.queue());
     searcher_ = std::make_unique<Searcher>(app.queue());
@@ -312,11 +103,11 @@ void Pane::relabel() {
     dismiss_->tooltip_text(fo::tr("Dismiss"));
     cancel_->copy_label(fo::tr("Cancel"));
     empty_trash_->copy_label(fo::tr("Empty Trash"));
-    if (bar_ && !folder_.empty()) {
-        bar_->relabel();
-        build_crumbs(); // Recents, Trash
-        bar_->update();
+    if (!folder_.empty()) {
+        build_crumbs(); // Recents, Trash, Home
+        win_->pane_view_changed(this);
     }
+    list_header_->columns(list_header_columns());
     files()->empty_text(query_.empty() ? fo::tr("Empty") : fo::tr("No matches"));
     redraw();
 }
@@ -327,10 +118,6 @@ Pane::~Pane() {
     if (App::get().preview().owner() == this)
         App::get().preview().close();
     Fl::remove_timeout(nullptr, this);
-    // The path bar belongs to the window's top bar.
-    if (bar_ && bar_->parent())
-        bar_->parent()->remove(bar_);
-    delete bar_;
 }
 
 void Pane::wire(FileView *v) {
@@ -355,10 +142,15 @@ void Pane::wire(FileView *v) {
         if (st & (FL_CTRL | FL_ALT | FL_META))
             return false;
         const char *t = Fl::event_text();
-        // Window keys win over type-ahead (Folio has no type-ahead for them).
-        if (t && Fl::event_length() == 1 && std::strchr("qsS?/ ", t[0]) && t[0])
-            return win_->run_shortcut();
-        if (v->layout() == fo::Collection::Layout::List && (k == FL_Right || k == FL_Left)) {
+        // Files: typing filters the folder (the header shows the filter).
+        if (t && Fl::event_length() > 0 && static_cast<unsigned char>(t[0]) > 0x20 && t[0] != 0x7f &&
+            k != FL_BackSpace && k != FL_Delete && k != FL_Escape && k != FL_Enter && k != FL_KP_Enter) {
+            if (!in_recents() && v->mode() != FileView::Mode::Column)
+                win_->begin_filter(std::string(t, size_t(Fl::event_length())));
+            return true;
+        }
+        if ((v->layout() == fo::Collection::Layout::List || v->layout() == fo::Collection::Layout::Bands) &&
+            (k == FL_Right || k == FL_Left) && v->mode() != FileView::Mode::Column) {
             if (k == FL_Left) {
                 go_up();
             } else if (const Entry *e = current_entry(); e && e->is_dir) {
@@ -370,7 +162,17 @@ void Pane::wire(FileView *v) {
     });
 }
 
-FileView *Pane::files() const { return view_ == View::Columns ? columns_->here() : grid_; }
+FileView *Pane::files() const { return view_ == View::Columns && !dual_ ? columns_->here() : grid_; }
+
+bool Pane::can_go_up() const {
+    if (in_recents() || folder_ == "/")
+        return false;
+    return !(!crumbs_.empty() && crumbs_.front().second == folder_ && folder_ != xdg::home());
+}
+
+std::vector<fo::SortHeader::Column> Pane::list_header_columns() const {
+    return {{fo::tr("Name"), "sort"}, {fo::tr("Size"), "database"}, {fo::tr("Date"), "clock"}, {fo::tr("Type"), "file"}};
+}
 
 std::string Pane::title() const {
     if (in_recents())
@@ -386,45 +188,103 @@ std::string Pane::title() const {
 
 void Pane::set_view(View v) {
     FileView *old = files();
-    int cur = old->current();
-    std::vector<int> sel = old->selection();
+    std::vector<std::string> sel_paths;
+    for (int i : old->selection())
+        sel_paths.push_back(model_.path(i));
+    std::string cur_path = model_.path(old->current());
     // Hiding the focused view hands the keyboard to some other widget, so
     // whether the files had it is decided before.
-    const bool had_keyboard = !Fl::focus() || Fl::focus() == old || win_->remembered_focus() == old;
+    const bool had_keyboard = !Fl::focus() || Fl::focus() == old || Fl::focus() == space_ ||
+                              win_->remembered_focus() == old || win_->remembered_focus() == space_;
+    bool reorder = (view_ == View::Groups) != (v == View::Groups);
     view_ = v;
-    if (v == View::Columns) {
-        grid_->hide();
-        columns_->show();
-    } else {
-        columns_->hide();
-        grid_->show();
-        grid_->mode(v == View::Grid ? FileView::Mode::Grid : FileView::Mode::List);
-    }
+    if (reorder)
+        order_for_view();
     FileView *now = files();
-    if (now != old) {
+    if (now != old || reorder) {
         now->reload(true);
         now->set_current(-1, true);
-        for (int i : sel)
-            now->select(i, true);
-        if (cur >= 0)
-            now->set_current(cur, false);
-    } else if (cur >= 0) {
-        now->ensure_visible(cur, false);
+        for (const auto &p : sel_paths) {
+            int at = model_.index_of_path(p);
+            if (at >= 0)
+                now->select(at, true);
+        }
+        int c = model_.index_of_path(cur_path);
+        if (c >= 0)
+            now->set_current(c, false);
     }
-    if (v == View::Columns)
+    if (v == View::Columns && !dual_)
         columns_->sync();
-    if (win_->index_of(this) == 0) {
-        App::get().settings().view = v == View::Grid ? ViewMode::Grid : v == View::List ? ViewMode::List : ViewMode::Columns;
+    if (v == View::Space && !dual_)
+        space_->sync();
+    if (!dual_ && win_->index_of(this) == 0) {
+        ViewMode m = v == View::Grid      ? ViewMode::Grid
+                     : v == View::List    ? ViewMode::List
+                     : v == View::Columns ? ViewMode::Columns
+                     : v == View::Space   ? ViewMode::Space
+                                          : ViewMode::Groups;
+        App::get().settings().view = m;
         App::get().save_settings();
     }
     place_children();
-    bar_->update();
+    win_->pane_view_changed(this);
     if (had_keyboard)
         focus_view();
 }
 
-void Pane::cycle_view() {
-    set_view(view_ == View::Grid ? View::List : view_ == View::List ? View::Columns : View::Grid);
+void Pane::dual(bool on) {
+    dual_ = on;
+    place_children();
+    if (on && view_ == View::Groups) {
+        // The dual view lists rows: the model goes back to the plain sort.
+        View keep = view_;
+        view_ = View::List;
+        order_for_view();
+        view_ = keep;
+        files()->reload(false);
+    } else if (!on) {
+        order_for_view();
+        files()->reload(false);
+        if (view_ == View::Columns)
+            columns_->sync();
+        if (view_ == View::Space)
+            space_->sync();
+    }
+    redraw();
+}
+
+// Files' Groups order: the folders, then the files by age section (the
+// sort holds within each part); every other view keeps the plain sort.
+void Pane::order_for_view() {
+    if (query_.size() || in_recents()) {
+        int n = model_.count();
+        int ends[5] = {0, n, n, n, n};
+        grid_->groups(ends);
+        return;
+    }
+    sort_entries(model_.entries, sort_);
+    int folders = 0;
+    while (folders < model_.count() && model_.entries[size_t(folders)].is_dir)
+        ++folders;
+    if (view_ != View::Groups || dual_) {
+        int n = model_.count();
+        int ends[5] = {folders, n, n, n, n};
+        grid_->groups(ends);
+        return;
+    }
+    int64_t now = int64_t(std::time(nullptr));
+    std::stable_sort(model_.entries.begin() + folders, model_.entries.end(), [now](const Entry &a, const Entry &b) {
+        return int(age_section(a.mtime_ns, now)) < int(age_section(b.mtime_ns, now));
+    });
+    int ends[5];
+    ends[0] = folders;
+    int i = folders;
+    for (int sec = 0; sec < 4; ++sec) {
+        while (i < model_.count() && int(age_section(model_.entries[size_t(i)].mtime_ns, now)) == sec)
+            ++i;
+        ends[sec + 1] = i;
+    }
+    grid_->groups(ends);
 }
 
 // --- Going places ------------------------------------------------------------
@@ -446,10 +306,11 @@ void Pane::navigate(const std::string &path, const std::string &select, bool his
     if (searcher_)
         searcher_->cancel();
     query_.clear();
-    if (bar_->searching())
-        bar_->end_search(false);
-    if (bar_->editing())
-        bar_->stop_editing(false);
+    filter_.clear();
+    all_.clear();
+    if (win_->active_pane() == this)
+        win_->end_field(false);
+    App::get().sizes().cancel();
     message_.clear();
     if (p != folder_)
         remember_listing();
@@ -477,9 +338,10 @@ void Pane::navigate(const std::string &path, const std::string &select, bool his
 }
 
 void Pane::after_folder_change() {
-    bar_->update();
-    if (view_ == View::Columns)
+    if (view_ == View::Columns && !dual_)
         columns_->sync();
+    if (view_ == View::Space && !dual_)
+        space_->sync();
     files()->empty_text(fo::tr("Empty"));
     files()->show_folders(false);
     place_children();
@@ -517,10 +379,7 @@ void Pane::build_crumbs() {
         if (d.mounted && !d.path.empty() && d.path != "/" && path_inside(folder_, d.path) &&
             (!drive || d.path.size() > drive->path.size()))
             drive = &d;
-    if (path_inside(folder_, home) && !(drive && path_inside(drive->path, home))) {
-        root = home;
-        root_label = "~";
-    } else if (drive) {
+    if (drive && !path_inside(drive->path, home)) {
         // A drive is its own root, named as the sidebar names it.
         root = drive->path;
         root_label = drive->name;
@@ -532,7 +391,8 @@ void Pane::build_crumbs() {
         root_label = host == std::string::npos ? mount : mount.substr(host + 5);
         root_label = root_label.substr(0, root_label.find_first_of(".,"));
     }
-    crumbs_.push_back({root_label, root});
+    // Files' chips: every folder from the root, the home folder named Home.
+    crumbs_.push_back({root == home ? fo::tr("Home") : root_label, root});
     std::string rest = folder_.substr(root.size());
     std::string acc = root == "/" ? "" : root;
     size_t i = rest.empty() ? 0 : (rest[0] == '/' ? 1 : 0);
@@ -541,7 +401,7 @@ void Pane::build_crumbs() {
         std::string part = rest.substr(i, j == std::string::npos ? std::string::npos : j - i);
         acc += "/" + part;
         if (!part.empty())
-            crumbs_.push_back({part, acc});
+            crumbs_.push_back({acc == home ? fo::tr("Home") : part, acc});
         if (j == std::string::npos)
             break;
         i = j + 1;
@@ -586,8 +446,19 @@ void Pane::landed(ListingPtr l, bool keep) {
         showing_cached_ = false;
         same = l->error.empty() && same_listing(model_.entries, l->entries);
     }
-    if (!same)
-        model_.entries = l->entries;
+    if (!same) {
+        if (!filter_.empty()) {
+            all_ = l->entries;
+            NameFilter f(filter_);
+            model_.entries.clear();
+            for (const auto &e : all_)
+                if (f.matches(e))
+                    model_.entries.push_back(e);
+        } else {
+            model_.entries = l->entries;
+        }
+        order_for_view();
+    }
     model_.error = l->error;
     model_.loading = !l->complete;
     if (!same)
@@ -620,16 +491,20 @@ void Pane::landed(ListingPtr l, bool keep) {
         else if (!keep_current_.empty() && cur_row >= 0 && model_.count() > 0)
             v->set_current(std::min(cur_row, model_.count() - 1), true); // the item went: the next one
     } else if (l->complete) {
-        v->set_current(-1, true);
+        // Files focuses (and marks) the first entry of a folder it arrives in.
+        v->set_current(model_.count() > 0 ? 0 : -1, true);
     }
     if (l->complete) {
         keep_paths_.clear();
         keep_current_.clear();
         count_folders();
+        request_sizes();
         App::get().trim_soon();
     }
-    if (view_ == View::Columns)
+    if (view_ == View::Columns && !dual_)
         columns_->selection_changed();
+    if (view_ == View::Space && !dual_)
+        space_->sync();
     place_children();
     selection_changed();
     redraw();
@@ -643,9 +518,10 @@ void Pane::remember_listing() {
         model_.entries.empty())
         return;
     CachedListing l;
-    l.entries = std::move(model_.entries);
+    l.entries = filter_.empty() ? std::move(model_.entries) : std::move(all_);
     l.peeks = std::move(model_.peeks);
     model_.entries.clear();
+    all_.clear();
     model_.peeks.clear();
     App::get().listings().put(ListingCache::key(folder_, hidden_, sort_), std::move(l));
 }
@@ -660,6 +536,7 @@ bool Pane::recall_listing() {
     model_.entries = std::move(l.entries);
     model_.peeks = std::move(l.peeks);
     showing_cached_ = true;
+    order_for_view();
     static const bool trace = std::getenv("FLO_TRACE_LISTINGS") != nullptr;
     if (trace)
         std::fprintf(stderr, "flo: recalled %s (%d entries, %zu remembered listings)\n", folder_.c_str(),
@@ -678,6 +555,10 @@ void Pane::count_folders() {
         folders, hidden_,
         [this](std::vector<FolderSummary> batch) {
             for (auto &b : batch) {
+                if (!filter_.empty())
+                    for (auto &e : all_)
+                        if (path_join(folder_, e.name) == b.folder)
+                            e.item_count = b.count;
                 int at = model_.index_of_path(b.folder);
                 if (at < 0)
                     continue;
@@ -995,9 +876,7 @@ void Pane::selection_changed() {
 
 bool Pane::in_trash() const { return in_trash_folder(folder_); }
 
-bool Pane::typing() const {
-    return bar_->editing() || bar_->search_focused() || win_->modal_open();
-}
+bool Pane::typing() const { return win_->typing() || win_->modal_open(); }
 
 void Pane::copy(bool cut) {
     auto paths = selected_paths();
@@ -1129,7 +1008,7 @@ void Pane::toggle_hidden() {
     hidden_ = !hidden_;
     App::get().settings().show_hidden = hidden_;
     App::get().save_settings();
-    bar_->update();
+    win_->pane_view_changed(this);
     if (!query_.empty())
         set_query(query_);
     else
@@ -1142,20 +1021,11 @@ void Pane::set_sort(SortMode m) {
     sort_ = m;
     App::get().settings().sort = m;
     App::get().save_settings();
-    bar_->update();
+    win_->pane_view_changed(this);
     if (query_.empty())
         reload(true);
     if (view_ == View::Columns)
         columns_->refresh();
-}
-
-void Pane::step_sort(int by) {
-    int i = 0;
-    for (int k = 0; k < 5; ++k)
-        if (kSorts[k] == sort_)
-            i = k;
-    set_sort(kSorts[(i + by + 5) % 5]);
-    fo::Toast::show(win_, sort_tip(sort_).substr(0, sort_tip(sort_).rfind(" (")), 1.5);
 }
 
 void Pane::sort_menu() {
@@ -1165,8 +1035,10 @@ void Pane::sort_menu() {
         SortMode m = kSorts[k];
         items.push_back(fo::MenuItem(fo::tr(labels[k]), "", [this, m] { set_sort(m); }).check(m == sort_));
     }
-    auto *b = bar_->sort_b;
-    fo::PopupMenu::open_below(win_, b->x(), b->y(), b->w(), b->h(), items, true);
+    if (list_header_->visible())
+        fo::PopupMenu::open_below(win_, list_header_->x(), list_header_->y(), 200, list_header_->h(), items);
+    else
+        fo::PopupMenu::open_at(win_, x() + 40, y() + 40, items);
 }
 
 void Pane::toggle_pin(const std::string &path) {
@@ -1370,8 +1242,12 @@ bool Pane::escape() {
         v->set_current(v->current(), true);
         return true;
     }
-    if (!query_.empty() || bar_->searching()) {
-        bar_->end_search();
+    if (!filter_.empty()) {
+        set_filter("");
+        return true;
+    }
+    if (!query_.empty()) {
+        set_query("");
         return true;
     }
     return false;
@@ -1709,24 +1585,35 @@ int Pane::banner_height() const {
     return banner_text(e, p).empty() ? 0 : kBanner;
 }
 
+int Pane::header_height() const {
+    int h = dual_ ? kDualHeader : 0;
+    if (dual_ || view_ == View::List)
+        h += kListHeader;
+    return h;
+}
+
 void Pane::place_children() {
     int bh = banner_height();
     bool trash_bar = in_trash() && model_.count() > 0;
     bool err, prog;
     banner_text(err, prog);
+    // Files' content margins: 16 px from the rail and the inspector, 4 px
+    // under the tabs, 8 px above the status bar.
+    const int mx = dual_ ? 8 : 16, top = y() + 4 + (dual_ ? kDualHeader : 0);
+    const int cx = x() + mx, cw = std::max(10, w() - 2 * mx);
     if (bh && !message_.empty()) {
-        dismiss_->resize(x() + w() - 12 - 32, y() + (kBanner - 32) / 2, 32, 32);
+        dismiss_->resize(x() + w() - 12 - 32, top + (kBanner - 32) / 2, 32, 32);
         dismiss_->show();
     } else {
         dismiss_->hide();
     }
     if (bh && prog && message_.empty() && model_.error.empty()) {
-        cancel_->resize(x() + w() - 12 - 88, y() + (kBanner - 28) / 2, 88, 28);
+        cancel_->resize(x() + w() - 12 - 88, top + (kBanner - 28) / 2, 88, 28);
         cancel_->show();
     } else {
         cancel_->hide();
     }
-    int ty = y() + bh;
+    int ty = top + bh;
     if (trash_bar) {
         empty_trash_->resize(x() + (w() - 140) / 2, ty + (kTrashBar - 32) / 2, 140, 32);
         empty_trash_->show();
@@ -1734,11 +1621,57 @@ void Pane::place_children() {
     } else {
         empty_trash_->hide();
     }
-    int vh = std::max(10, y() + h() - ty);
-    if (view_ == View::Columns)
-        columns_->resize(x(), ty, w(), vh);
+    bool list_header = dual_ || view_ == View::List;
+    if (list_header) {
+        list_header_->resize(cx, ty, cw, kListHeader);
+        list_header_->show();
+        // Files' list columns (list_columns.rs) over the rows.
+        const bool d = dual_;
+        const int start = d ? 30 : 48, pad = d ? 6 : 10, min_name = d ? 128 : 160;
+        const int size_w = d ? 74 : 104, date_w = d ? 0 : 86, kind_w = d ? 0 : 92;
+        int avail = std::max(0, cw - start - pad);
+        bool sz = avail >= min_name + 8 + size_w;
+        bool dt = date_w > 0 && avail >= min_name + 16 + size_w + date_w;
+        bool kd = dt && kind_w > 0 && avail >= min_name + 24 + size_w + date_w + kind_w;
+        int name_w = avail - (sz ? 8 + size_w : 0) - (dt ? 8 + date_w : 0) - (kd ? 8 + kind_w : 0);
+        auto cols = list_header_columns();
+        cols[0].x = start, cols[0].w = name_w;
+        std::vector<fo::SortHeader::Column> shown = {cols[0]};
+        if (sz)
+            cols[1].x = start + name_w + 8, cols[1].w = size_w, cols[1].right = true, shown.push_back(cols[1]);
+        if (dt)
+            cols[2].x = start + name_w + 16 + size_w, cols[2].w = date_w, cols[2].right = true, shown.push_back(cols[2]);
+        if (kd)
+            cols[3].x = start + name_w + 24 + size_w + date_w, cols[3].w = kind_w, cols[3].right = true,
+            shown.push_back(cols[3]);
+        list_header_->columns(shown);
+        int sorted = sort_ == SortMode::Size ? 1 : sort_ == SortMode::Newest || sort_ == SortMode::Oldest ? 2
+                     : sort_ == SortMode::Kind ? 3 : 0;
+        if (sorted >= int(shown.size()))
+            sorted = 0;
+        list_header_->sorted(sorted, sort_ == SortMode::Newest || sort_ == SortMode::Size);
+        ty += kListHeader;
+    } else {
+        list_header_->hide();
+    }
+    int vh = std::max(10, y() + h() - 8 - ty);
+    bool cols = view_ == View::Columns && !dual_, space = view_ == View::Space && !dual_;
+    cols ? columns_->show() : columns_->hide();
+    space ? space_->show() : space_->hide();
+    (cols || space) ? grid_->hide() : grid_->show();
+    if (dual_)
+        grid_->mode(FileView::Mode::Dual);
+    else if (view_ == View::Grid)
+        grid_->mode(FileView::Mode::Grid);
+    else if (view_ == View::List)
+        grid_->mode(FileView::Mode::List);
     else
-        grid_->resize(x() + 8, ty, std::max(10, w() - 16), vh);
+        grid_->mode(FileView::Mode::Groups);
+    if (cols)
+        columns_->resize(cx, ty, cw, vh);
+    if (space)
+        space_->resize(cx, ty, cw, vh);
+    grid_->resize(cx, ty, cw, vh);
     redraw();
 }
 
@@ -1754,23 +1687,37 @@ void Pane::draw() {
         return;
     }
     fo::paint::fill(x(), y(), w(), h(), t.background());
+    int top = y() + 4;
+    if (dual_) {
+        // Files' dual header: the folder, its path, the filter glyph; the
+        // active pane in the accent.
+        bool active = win_->active_pane() == this;
+        fo::Rgb c = active ? t.accent() : t.dim();
+        fo::icon::draw("folder", x() + 10, top + 6, 13, c);
+        std::string where = title() + " \xC2\xB7 " + (in_recents() ? std::string() : folder_);
+        fo::text::draw(where, x() + 28, top, w() - 60, kDualHeader - 4, c, fo::text::REGULAR, 11);
+        fo::icon::draw("filter", x() + w() - 26, top + 7, 11, filter_.empty() ? t.dim() : t.accent());
+        if (active)
+            fo::paint::fill(x() + 8, top + kDualHeader - 3, w() - 16, 1, t.accent());
+        top += kDualHeader;
+    }
     bool err, prog;
     std::string text = banner_text(err, prog);
     int bh = text.empty() ? 0 : kBanner;
     if (bh) {
-        fo::paint::fill(x(), y(), w(), bh, err ? t.red() : t.accent(), err ? 0.14 : 0.10);
+        int r = t.radius() > 0 ? 7 : 0;
+        fo::paint::round_fill(x() + 16, top, w() - 32, bh - 4, r, err ? t.tint(t.red(), 0.16) : t.card());
         int right = x() + w() - 12 - (dismiss_->visible() ? 40 : cancel_->visible() ? 100 : 0);
         if (prog && progress_.bytes_total > 0) {
             double f = std::min(1.0, double(progress_.bytes_done) / double(progress_.bytes_total));
             int pw = 120;
             right -= pw + 12;
-            fo::paint::fill(right + 6, y() + bh / 2 - 2, pw, 4, t.foreground(), 0.15);
-            fo::paint::fill(right + 6, y() + bh / 2 - 2, int(pw * f), 4, t.accent());
+            fo::paint::fill(right + 6, top + bh / 2 - 2, pw, 4, t.selection());
+            fo::paint::fill(right + 6, top + bh / 2 - 2, int(pw * f), 4, t.accent());
         }
-        fo::text::draw(text, x() + 24, y(), right - x() - 24, bh, t.bright_foreground());
+        fo::text::draw(text, x() + 32, top, right - x() - 32, bh - 4, err ? t.red() : t.foreground(),
+                       fo::text::REGULAR, 12);
     }
-    if (in_trash() && model_.count() > 0)
-        fo::paint::fill(x(), y() + bh, w(), kTrashBar, t.foreground(), 0.04);
     draw_children();
 }
 
@@ -1799,6 +1746,227 @@ int Pane::handle(int event) {
         break;
     }
     return Fl_Group::handle(event);
+}
+
+// --- Files' filter, selection, sizes and transfers --------------------------------------
+
+void Pane::set_filter(const std::string &text) {
+    if (text == filter_ || in_recents())
+        return;
+    FileView *v = files();
+    std::string cur = model_.path(v->current());
+    std::vector<std::string> sel;
+    for (int i : v->selection())
+        sel.push_back(model_.path(i));
+    if (filter_.empty() && !text.empty())
+        all_ = model_.entries;
+    filter_ = text;
+    if (filter_.empty()) {
+        if (!all_.empty() || model_.entries.empty())
+            model_.entries = std::move(all_);
+        all_.clear();
+    } else {
+        NameFilter f(filter_);
+        model_.entries.clear();
+        for (const auto &e : all_)
+            if (f.matches(e))
+                model_.entries.push_back(e);
+    }
+    order_for_view();
+    v->reload(true);
+    v->set_current(-1, true);
+    for (const auto &p : sel) {
+        int at = model_.index_of_path(p);
+        if (at >= 0)
+            v->select(at, true);
+    }
+    int c = model_.index_of_path(cur);
+    if (c >= 0)
+        v->set_current(c, false);
+    else if (model_.count() > 0 && !filter_.empty())
+        v->set_current(0, true);
+    v->empty_text(filter_.empty() ? fo::tr("Empty") : fo::tr("No matches"));
+    if (view_ == View::Space && !dual_)
+        space_->sync();
+    win_->pane_view_changed(this);
+    selection_changed();
+    redraw();
+}
+
+void Pane::select_filtered() {
+    if (filter_.empty())
+        return;
+    std::vector<std::string> marks;
+    for (int i = 0; i < model_.count(); ++i)
+        marks.push_back(model_.path(i));
+    set_filter("");
+    win_->end_field(false);
+    FileView *v = files();
+    v->clear_selection();
+    int first = -1;
+    for (const auto &p : marks) {
+        int at = model_.index_of_path(p);
+        if (at >= 0) {
+            v->select(at, true);
+            if (first < 0)
+                first = at;
+        }
+    }
+    if (first >= 0)
+        v->set_current(first, false);
+    focus_view();
+}
+
+void Pane::invert_selection() {
+    FileView *v = files();
+    for (int i = 0; i < model_.count(); ++i)
+        v->select(i, !v->selected(i));
+}
+
+void Pane::clear_selection() {
+    files()->set_current(-1, true);
+    selection_changed();
+}
+
+void Pane::select_all() { files()->select_all(); }
+
+void Pane::mark_and_advance() {
+    FileView *v = files();
+    int c = v->current();
+    if (c < 0) {
+        if (model_.count() > 0)
+            v->set_current(0, false);
+        return;
+    }
+    v->select(c, !v->selected(c));
+    if (c + 1 < model_.count()) {
+        // Moves on without dropping the batch.
+        std::vector<int> keep = v->selection();
+        v->set_current(c + 1, false);
+        for (int i : keep)
+            v->select(i, true);
+    }
+}
+
+void Pane::new_file() {
+    if (in_trash() || in_recents())
+        return;
+    auto *d = fo::Dialog::prompt(win_, fo::tr("Create file"), "", fo::tr("New file.txt"), fo::tr("Create"),
+                                 [this](bool ok, const std::string &name) {
+                                     if (!ok)
+                                         return;
+                                     std::string p = path_join(folder_, name);
+                                     // Never overwrites: the name must be free.
+                                     int fd = ::open(p.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
+                                                     0644);
+                                     if (fd < 0) {
+                                         show_message(fo::i18n::arg(fo::tr("%1 can't be created."), quoted(name)));
+                                         return;
+                                     }
+                                     ::close(fd);
+                                     pending_select_ = name;
+                                     reload(false);
+                                 },
+                                 0, 8);
+    d->on_validate([d, this](const std::string &s) {
+        if (!valid_file_name(s)) {
+            d->set_error(fo::tr("A name can't be empty, contain / or be . or .."));
+            return false;
+        }
+        if (exists_nofollow(path_join(folder_, s))) {
+            d->set_error(fo::tr("That name is taken"));
+            return false;
+        }
+        return true;
+    });
+}
+
+void Pane::transfer(bool move, const std::string &folder) {
+    auto paths = selected_paths();
+    if (paths.empty())
+        return;
+    if (move && (in_trash() || in_recents()))
+        move = false;
+    std::string dest = folder;
+    Pane *other = win_->other_pane(this);
+    if (dest.empty() && other && !other->in_recents())
+        dest = other->folder();
+    int n = int(paths.size());
+    std::string what = n == 1 ? quoted(path_basename(paths[0])) : fo::trn("%n items", n);
+    // Files reviews the destination before anything is queued.
+    fo::Dialog::prompt(win_, move ? fo::tr("Move") : fo::tr("Copy"),
+                       fo::i18n::arg(move ? fo::tr("Move %1 to:") : fo::tr("Copy %1 to:"), what),
+                       tilde(dest.empty() ? folder_ : dest), move ? fo::tr("Move") : fo::tr("Copy"),
+                       [this, paths, move](bool ok, const std::string &to) {
+                           if (!ok)
+                               return;
+                           std::string target = expand_typed(to, folder_);
+                           if (!is_dir(target)) {
+                               show_message(fo::i18n::arg(fo::tr("%1 can't be opened."), quoted(tilde(target))));
+                               return;
+                           }
+                           if (move)
+                               ops_->move(paths, target, ConflictPolicy::Ask);
+                           else
+                               ops_->copy(paths, target, ConflictPolicy::Ask);
+                       });
+}
+
+void Pane::request_sizes() {
+    if (!App::get().settings().auto_sizes || in_recents() || !query_.empty() || in_trash())
+        return;
+    std::vector<std::string> folders;
+    for (int i = 0; i < model_.count() && folders.size() < 200; ++i)
+        if (model_.entries[size_t(i)].is_dir && !model_.entries[size_t(i)].is_link)
+            folders.push_back(model_.path(i));
+    if (!folders.empty())
+        App::get().sizes().request(folders);
+}
+
+void Pane::measure_focused() {
+    const Entry *e = current_entry();
+    std::string p = e && e->is_dir ? current_path() : folder_;
+    if (p.empty() || p == kRecents)
+        return;
+    App::get().sizes().request({p}, true);
+    win_->sizes_changed();
+}
+
+void Pane::measure_listed() {
+    std::vector<std::string> folders;
+    for (int i = 0; i < model_.count(); ++i)
+        if (model_.entries[size_t(i)].is_dir && !model_.entries[size_t(i)].is_link)
+            folders.push_back(model_.path(i));
+    if (!folders.empty())
+        App::get().sizes().request(folders, true);
+    win_->sizes_changed();
+}
+
+void Pane::sort_clicked(int column) {
+    // Files' List header: name, size (biggest first), date (newest first,
+    // then oldest), type.
+    const auto &cols = list_header_columns();
+    (void)cols;
+    switch (column) {
+    case 1: set_sort(SortMode::Size); break;
+    case 2: set_sort(sort_ == SortMode::Newest ? SortMode::Oldest : SortMode::Newest); break;
+    case 3: set_sort(SortMode::Kind); break;
+    default: set_sort(SortMode::Name); break;
+    }
+    place_children();
+}
+
+std::string Pane::status_text() const {
+    FileView *v = files();
+    int marked = v->selection_count();
+    std::string head = marked == 0 && v->current() < 0 ? std::string(fo::tr("No selection")) : fo::trn("%n marked", marked);
+    std::string items = fo::trn("%n items", model_.count());
+    if (!filter_.empty())
+        items += " " + fo::i18n::arg(fo::tr("of %1"), std::to_string(all_.size()));
+    std::string s = head + " \xC2\xB7 " + items;
+    if (model_.loading)
+        s += std::string(" \xC2\xB7 ") + fo::tr("loading\xE2\x80\xA6");
+    return s;
 }
 
 } // namespace flo::ui

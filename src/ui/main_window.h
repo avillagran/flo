@@ -1,7 +1,9 @@
-// A Flo window, laid out like Folio's: one bar across the top (each pane's
-// path bar), the sidebar, one folder pane or two side by side (Ctrl+Alt+N,
-// Ctrl+W), and the details pane (Ctrl+I). The sidebar and the details
-// follow the pane used last.
+// A Flo window, laid out as Files lays its window out: a header (back,
+// forward and up; the path chips or the omnibar; compact view and action
+// buttons with Preferences at the far right), the tab strip under it, the
+// 52 px rail on the left, the folder (one pane, or two with F9), the
+// inspector on the right and the status bar at the bottom. The header, the
+// rail and the inspector follow the pane used last.
 #pragma once
 
 #include "core/places.h"
@@ -13,7 +15,14 @@
 #include <vector>
 
 namespace fo {
+class Breadcrumbs;
+class IconButton;
 class Sidebar;
+class StatusBar;
+class TabStrip;
+class TextField;
+class ToolBar;
+struct MenuItem;
 struct SidebarRow;
 } // namespace fo
 
@@ -24,25 +33,62 @@ class DetailsPane;
 
 class MainWindow : public fo::Window {
 public:
-    static constexpr int kBar = 60, kSidebar = 236, kDetails = 300;
+    // Files' metrics: a 58 px header, 32 px tabs and status bar, a 52 px
+    // rail (170 px expanded) and a 240 px inspector.
+    static constexpr int kHeader = 58, kTabs = 32, kTop = kHeader + kTabs, kStatus = 32;
+    static constexpr int kRail = 52, kRailWide = 170, kInspector = 240, kMaxTabs = 8;
 
     MainWindow(int w, int h, const std::string &folder, const std::string &select);
     ~MainWindow() override;
 
-    Pane *active_pane() const { return panes_[active_]; }
-    Pane *pane(int i) const { return i >= 0 && i < 2 ? panes_[i] : nullptr; }
-    bool split() const { return panes_[1] != nullptr; }
-    int index_of(const Pane *p) const { return p == panes_[0] ? 0 : p == panes_[1] ? 1 : -1; }
+    // pane(0) is the current tab, pane(1) the dual view's second pane.
+    // Null while the first pane is being made.
+    Pane *active_pane() const { return active_ == 1 && dual_ ? dual_ : tabs_.empty() ? nullptr : tabs_[size_t(tab_)]; }
+    Pane *pane(int i) const { return i == 0 ? (tabs_.empty() ? nullptr : tabs_[size_t(tab_)]) : i == 1 ? dual_ : nullptr; }
+    const std::vector<Pane *> &tab_panes() const { return tabs_; }
+    bool split() const { return dual_ != nullptr; }
+    int index_of(const Pane *p) const;
     void set_active(Pane *p);
+    Pane *other_pane(const Pane *p) const;
 
+    // Tabs (Ctrl+T, Ctrl+W, Ctrl+Shift+T, Ctrl+Tab).
+    void new_tab(const std::string &folder, bool background = false);
+    void close_tab(int i);
+    void reopen_tab();
+    void select_tab(int i);
+
+    // F9: the dual view.
+    void toggle_dual();
     void open_split();
     void close_split();
     bool details_visible() const { return details_on_; }
     void toggle_details();
 
-    // The sidebar and the details pane follow the active pane.
-    void pane_moved(Pane *p);     // folder changed
-    void pane_selected(Pane *p);  // selection changed
+    // The header's field: the omnibar (Ctrl+L: a path, >command or :place),
+    // the filter (typing in the files, Ctrl+F) or a recursive search
+    // (Ctrl+Shift+F).
+    enum class Field { None, Path, Filter, Search };
+    void edit_path();
+    void begin_filter(const std::string &text = {});
+    void begin_search();
+    void end_field(bool refocus = true);
+    Field field() const { return field_mode_; }
+    bool typing() const;
+
+    // Menus: Actions (F10), Preferences (Ctrl+,) and the commands palette
+    // (Ctrl+Shift+P).
+    void actions_menu();
+    void preferences_menu();
+    void commands();
+    std::vector<fo::MenuItem> actions_items();
+    std::vector<fo::MenuItem> preferences_items();
+
+    // The header, rail, tabs, status bar and inspector follow the panes.
+    void pane_moved(Pane *p);    // folder changed
+    void pane_selected(Pane *p); // selection changed
+    void pane_view_changed(Pane *p);
+    void update_status();
+    void sizes_changed();
     void rebuild_sidebar();
     void language_changed(); // relabels everything set once
     void focus_sidebar();
@@ -58,20 +104,37 @@ public:
     void hide() override;
 
 private:
+    void build_header();
     void build_shortcuts();
+    void update_header();
+    void update_tabs();
     void layout();
     static void relayout_frame(void *);
+    static void pss_tick(void *);
     void activate_row(const fo::SidebarRow &row);
     void sidebar_context(const fo::SidebarRow &row, int x, int y);
     std::string place_for(const std::string &folder) const;
+    Pane *make_pane(const std::string &folder, int view);
+    void run_omnibar(const std::string &text);
+    void open_menu_under(int item, std::vector<fo::MenuItem> items);
 
-    fo::Sidebar *sidebar_ = nullptr;
-    Pane *panes_[2] = {nullptr, nullptr};
+    fo::ToolBar *nav_ = nullptr, *tools_ = nullptr;
+    fo::Breadcrumbs *crumbs_ = nullptr;
+    fo::TextField *field_ = nullptr;
+    fo::IconButton *field_ok_ = nullptr, *field_cancel_ = nullptr;
+    fo::TabStrip *tab_strip_ = nullptr;
+    fo::Sidebar *rail_ = nullptr;
+    fo::StatusBar *status_ = nullptr;
     DetailsPane *details_ = nullptr;
-    int active_ = 0;
+
+    std::vector<Pane *> tabs_;
+    std::vector<std::string> closed_tabs_;
+    int tab_ = 0;
+    Pane *dual_ = nullptr;
+    int active_ = 0; // 0: the tab, 1: the dual pane
     bool details_on_ = true;
-    fo::Anim<double> details_w_, split_t_;
-    bool closing_split_ = false;
+    Field field_mode_ = Field::None;
+    std::string pss_;
 };
 
 } // namespace flo::ui
