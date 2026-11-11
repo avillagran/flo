@@ -111,6 +111,10 @@ To install as a package, `cd packaging && makepkg -si` (desktop entry for
 with fixture data (a home with 50 photos) and prints the run directory;
 `tools/xdrive.py` sends keys and clicks and takes screenshots there, and
 `tools/gui-session.sh stop RUN_DIR` stops it. Nothing touches your home.
+`FLO_SESSION_SETUP=tools/session-fixtures.sh` adds a removable drive, an
+SFTP stand-in, fake `tailscale`/`dropbox-cli`/`localsend` that only log,
+and private applications; `FLO_SESSION_BUS=1` gives the session a private
+D-Bus for `org.freedesktop.FileManager1`.
 
 Tests run in a fresh private directory under `build/test-runs/` with their
 own `HOME`, `TMPDIR` and XDG directories; they never touch your files.

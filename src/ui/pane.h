@@ -9,12 +9,14 @@
 #include "core/fileops.h"
 #include "core/lister.h"
 #include "core/mounter.h"
+#include "core/process.h"
 #include "core/search.h"
 #include "core/settings.h"
 #include "ui/util.h"
 
 #include <FL/Fl_Group.H>
 
+#include <functional>
 #include <memory>
 #include <string>
 #include <vector>
@@ -128,6 +130,11 @@ public:
     void context_menu(int index, int x, int y, FolderModel *where = nullptr, const std::string &folder = {});
     void menu_from_keyboard();
     void open_with(const std::string &path, const std::string &app);
+    void set_default(const std::string &mime, const std::string &app, const std::string &name);
+    // Share (as Folio): a Dropbox link, LocalSend, Taildrop.
+    void dropbox_link(const std::string &path);
+    void share_localsend(const std::vector<std::string> &paths);
+    void share_taildrop(const std::vector<std::string> &paths, const std::string &host, const std::string &name);
     void compress();
     void extract(const std::string &path);
     void drop_into(const std::vector<std::string> &paths, const std::string &folder);
@@ -171,6 +178,11 @@ private:
     std::string banner_text(bool &error, bool &progress) const;
     void wire(FileView *v);
     std::vector<fo::MenuItem> menu_for(int index, FolderModel *where, const std::string &folder);
+    std::vector<fo::MenuItem> share_menu(const std::vector<std::string> &paths, const std::string &target);
+    // Runs a tool off the UI thread with a busy banner, then `done` here
+    // (never after the pane is gone).
+    void run_tool(const std::vector<std::string> &argv, const std::string &busy, int timeout_ms,
+                  std::function<void(const ProcessResult &)> done);
 
     MainWindow *win_;
     PathBar *bar_;
@@ -200,6 +212,7 @@ private:
     std::string query_;
     bool searching_ = false;
     bool showing_cached_ = false; // a remembered listing, being re-read
+    bool password_given_ = false; // a mount password was just answered
 
     std::string message_;
     bool message_error_ = true;

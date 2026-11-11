@@ -74,6 +74,11 @@ struct AppChoice {
 // Applications that can open a type, the default first.
 std::vector<AppChoice> apps_for(const std::string &mime);
 bool launch_app(const std::string &id, const std::vector<std::string> &paths);
+// Makes `id` the default application for `mime`, as the user asked from
+// Open With: `xdg-mime default` (GIO's own call when xdg-utils is
+// missing). Blocking (a child process): call it off the UI thread.
+// Returns an error sentence, or "" on success.
+std::string set_default_app(const std::string &mime, const std::string &id);
 
 // "file:///a\r\nfile:///b\r\n" for drags.
 std::string uri_list_for_drag(const std::vector<std::string> &paths);

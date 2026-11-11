@@ -87,7 +87,7 @@ def main(args):
         elif c == "type":
             for ch in args[i + 1]:
                 press({" ": "space", "/": "slash", ".": "period", "-": "minus", "~": "asciitilde",
-                       "_": "underscore"}.get(ch, ch))
+                       "_": "underscore", ":": "colon", "@": "at", ",": "comma", "=": "equal"}.get(ch, ch))
             i += 2
         elif c in ("click", "button"):
             if c == "click":

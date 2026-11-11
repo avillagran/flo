@@ -497,9 +497,18 @@ void Pane::build_crumbs() {
     }
     const std::string home = xdg::home(), gvfs = gvfs_root();
     std::string root = "/", root_label = "/";
-    if (path_inside(folder_, home)) {
+    const Place *drive = nullptr;
+    for (const auto &d : App::get().places().drives)
+        if (d.mounted && !d.path.empty() && d.path != "/" && path_inside(folder_, d.path) &&
+            (!drive || d.path.size() > drive->path.size()))
+            drive = &d;
+    if (path_inside(folder_, home) && !(drive && path_inside(drive->path, home))) {
         root = home;
         root_label = "~";
+    } else if (drive) {
+        // A drive is its own root, named as the sidebar names it.
+        root = drive->path;
+        root_label = drive->name;
     } else if (!gvfs.empty() && path_inside(folder_, gvfs) && folder_ != gvfs) {
         std::string rest = folder_.substr(gvfs.size() + 1);
         std::string mount = rest.substr(0, rest.find('/'));
@@ -782,6 +791,7 @@ void Pane::show_item(const std::string &path) {
 }
 
 void Pane::open_peer(const std::string &host) {
+    password_given_ = false;
     busy_ = fo::i18n::arg(fo::tr("Connecting to %1\xE2\x80\xA6"), host.substr(0, host.find('.')));
     place_children();
     redraw();
@@ -807,6 +817,7 @@ void Pane::open_peer(const std::string &host) {
 }
 
 void Pane::open_uri(const std::string &uri) {
+    password_given_ = false;
     busy_ = fo::i18n::arg(fo::tr("Connecting to %1\xE2\x80\xA6"), uri);
     place_children();
     redraw();
@@ -829,13 +840,33 @@ void Pane::open_uri(const std::string &uri) {
         busy_.clear();
 }
 
+// GVfs's questions come in paragraphs; the dialog wraps one paragraph
+// (fo::text::wrap doesn't break at newlines yet), so they are joined.
+static std::string one_paragraph(const std::string &text) {
+    std::string out;
+    for (char c : text) {
+        if (c == '\n' || c == '\r' || c == '\t')
+            c = ' ';
+        if (c == ' ' && (out.empty() || out.back() == ' '))
+            continue;
+        out += c;
+    }
+    while (!out.empty() && out.back() == ' ')
+        out.pop_back();
+    return out;
+}
+
 void Pane::ask_mount(const MountRequest &r) {
     fo::DialogSpec s;
     s.scrim_cancels = false;
-    s.message = r.message;
+    s.message = one_paragraph(r.message);
     uint64_t id = r.id;
     if (r.kind == MountRequest::Password) {
         s.title = fo::tr("Sign in");
+        // Asked again after an answer: the password didn't work.
+        if (password_given_)
+            s.message = std::string(fo::tr("That password didn't work. Try again.")) + " " + s.message;
+        password_given_ = false;
         bool user = r.needs_user, domain = r.needs_domain;
         if (user)
             s.fields.push_back({fo::tr("User"), r.user});
@@ -858,6 +889,7 @@ void Pane::ask_mount(const MountRequest &r) {
             size_t k = 0;
             std::string u = user ? a.values[k++] : default_user;
             std::string d = domain ? a.values[k++] : default_domain;
+            password_given_ = true;
             mounter_->reply_password(id, u, a.values[k], d);
         });
     } else {
@@ -1148,6 +1180,132 @@ void Pane::open_with(const std::string &path, const std::string &app) {
         show_message(fo::tr("The application couldn't be started."));
 }
 
+void Pane::set_default(const std::string &mime, const std::string &app, const std::string &name) {
+    auto error = std::make_shared<std::string>();
+    std::weak_ptr<char> weak = alive_.weak();
+    fo::tasks::run([error, mime, app] { *error = set_default_app(mime, app); },
+                   [this, weak, error, mime, name] {
+                       if (weak.expired())
+                           return;
+                       if (!error->empty()) {
+                           show_message(fo::i18n::arg(fo::tr("The default couldn't be changed: %1"), *error));
+                           return;
+                       }
+                       std::string type = type_description(mime);
+                       fo::Toast::show(win_,
+                                       fo::i18n::arg(fo::i18n::arg(fo::tr("%1 now opens %2 files"), name),
+                                                     type.empty() ? mime : type),
+                                       3);
+                   });
+}
+
+// Share offers only what this machine has, as in Folio: a Dropbox link
+// for things in the Dropbox folder while Dropbox runs, LocalSend when it is
+// installed, and Taildrop to the online tailnet machines (its own menu,
+// last). With none of them there is no Share at all.
+std::vector<fo::MenuItem> Pane::share_menu(const std::vector<std::string> &paths, const std::string &target) {
+    using fo::MenuItem;
+    std::vector<MenuItem> share;
+    if (paths.empty() || target.empty())
+        return share;
+    const PlacesData &pd = App::get().places();
+    const std::string dropbox = xdg::home() + "/Dropbox/";
+    if (target.compare(0, dropbox.size(), dropbox) == 0 && !pd.dropbox.empty() && pd.dropbox != "stopped")
+        share.push_back(MenuItem(fo::tr("Dropbox Link"), "", [this, target] { dropbox_link(target); }));
+    if (!xdg::find_program("localsend").empty())
+        share.push_back(MenuItem(fo::tr("LocalSend\xE2\x80\xA6"), "", [this, paths] { share_localsend(paths); }));
+    if (!pd.peers.empty()) {
+        std::vector<MenuItem> sub;
+        for (const auto &p : pd.peers) {
+            std::string host = p.host.empty() ? p.name : p.host, name = p.name;
+            sub.push_back(MenuItem(p.name, "", [this, paths, host, name] { share_taildrop(paths, host, name); }));
+        }
+        share.push_back(MenuItem(fo::tr("Taildrop"), "", nullptr, sub));
+    }
+    return share;
+}
+
+void Pane::run_tool(const std::vector<std::string> &argv, const std::string &busy, int timeout_ms,
+                    std::function<void(const ProcessResult &)> done) {
+    busy_ = busy;
+    place_children();
+    redraw();
+    auto result = std::make_shared<ProcessResult>();
+    std::weak_ptr<char> weak = alive_.weak();
+    fo::tasks::run(
+        [result, argv, timeout_ms] {
+            RunOptions o;
+            o.timeout_ms = timeout_ms;
+            o.max_output = 64 * 1024;
+            *result = run_process(argv, o);
+        },
+        [this, weak, result, done] {
+            if (weak.expired())
+                return;
+            busy_.clear();
+            place_children();
+            redraw();
+            done(*result);
+        });
+}
+
+static std::string trimmed(std::string s) {
+    while (!s.empty() && (s.back() == '\n' || s.back() == '\r' || s.back() == ' '))
+        s.pop_back();
+    size_t a = s.find_first_not_of(" \n");
+    return a == std::string::npos ? std::string() : s.substr(a);
+}
+
+void Pane::dropbox_link(const std::string &path) {
+    const std::string name = path_basename(path);
+    if (xdg::find_program("dropbox-cli").empty()) {
+        show_message(fo::tr("Dropbox links need dropbox-cli, which isn't installed."));
+        return;
+    }
+    run_tool({"dropbox-cli", "sharelink", path},
+             fo::i18n::arg(fo::tr("Getting a Dropbox link for %1\xE2\x80\xA6"), name), 30000,
+             [this, name](const ProcessResult &r) {
+                 // dropbox-cli prints the link, or a sentence saying why not.
+                 std::string out = trimmed(r.out);
+                 std::string link = trimmed(out.substr(out.rfind('\n') == std::string::npos ? 0 : out.rfind('\n') + 1));
+                 if (!r.ok() || link.compare(0, 8, "https://") != 0) {
+                     std::string why = out.empty() ? trimmed(r.err) : out;
+                     show_message(fo::i18n::arg(fo::i18n::arg(fo::tr("Couldn't get a Dropbox link for %1: %2"), name), why));
+                     return;
+                 }
+                 App::get().copy_text(link);
+                 fo::Toast::show(win_, fo::i18n::arg(fo::tr("Dropbox link for %1 copied."), name), 3);
+             });
+}
+
+void Pane::share_localsend(const std::vector<std::string> &paths) {
+    // The same command Omarchy's Nautilus extension runs.
+    std::vector<std::string> argv = {"localsend", "--headless", "send"};
+    argv.insert(argv.end(), paths.begin(), paths.end());
+    if (paths.empty())
+        return;
+    if (xdg::find_program("localsend").empty() || !spawn_detached(argv))
+        show_message(fo::tr("Sharing nearby needs LocalSend, which isn't installed."));
+}
+
+void Pane::share_taildrop(const std::vector<std::string> &paths, const std::string &host, const std::string &name) {
+    if (paths.empty())
+        return;
+    if (xdg::find_program("tailscale").empty()) {
+        show_message(fo::tr("Sending with Taildrop needs tailscale, which isn't installed."));
+        return;
+    }
+    std::vector<std::string> argv = {"tailscale", "file", "cp"};
+    argv.insert(argv.end(), paths.begin(), paths.end());
+    argv.push_back(host + ":");
+    run_tool(argv, fo::i18n::arg(fo::tr("Sending to %1\xE2\x80\xA6"), name), -1, [this, name](const ProcessResult &r) {
+        if (!r.ok())
+            show_message(fo::i18n::arg(fo::i18n::arg(fo::tr("Couldn't send to %1: %2"), name), trimmed(r.err)));
+        else
+            fo::Toast::show(win_, fo::i18n::arg(fo::tr("Sent to %1"), name), 3);
+    });
+}
+
 void Pane::compress() {
     auto paths = selected_paths();
     if (!paths.empty() && !in_trash())
@@ -1293,6 +1451,20 @@ std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const st
                     sub.push_back(MenuItem(a.is_default ? fo::i18n::arg(fo::tr("%1 (default)"), a.name) : a.name, "",
                                            [this, target, id] { open_with(target, id); }));
                 }
+                // Changing the default is its own choice, never a side
+                // effect of opening with another application.
+                std::vector<MenuItem> defaults;
+                std::string mime = e.mime ? e.mime : "";
+                for (const auto &a : apps) {
+                    if (a.is_default)
+                        continue;
+                    std::string id = a.id, name = a.name;
+                    defaults.push_back(MenuItem(name, "", [this, mime, id, name] { set_default(mime, id, name); }));
+                }
+                if (!defaults.empty() && !mime.empty()) {
+                    sub.push_back(MenuItem::separator());
+                    sub.push_back(MenuItem(fo::tr("Set Default"), "", nullptr, defaults));
+                }
                 m.push_back(MenuItem(fo::tr("Open With"), "", nullptr, sub));
             }
         }
@@ -1344,21 +1516,9 @@ std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const st
         m.push_back(MenuItem(fo::tr("Compress"), "", [this, paths] { ops_->compress(paths); }));
         if (e.kind == Kind::Archive && !e.is_dir)
             m.push_back(MenuItem(fo::tr("Extract Here"), "", [this, target] { extract(target); }));
-        const auto &peers = App::get().places().peers;
-        if (!peers.empty() && !xdg::find_program("tailscale").empty()) {
-            std::vector<MenuItem> sub;
-            for (const auto &p : peers) {
-                std::string host = p.name;
-                sub.push_back(MenuItem(p.name, "", [this, paths, host] {
-                    std::vector<std::string> argv = {"tailscale", "file", "cp"};
-                    argv.insert(argv.end(), paths.begin(), paths.end());
-                    argv.push_back(host + ":");
-                    if (spawn_detached(argv))
-                        fo::Toast::show(win_, fo::i18n::arg(fo::tr("Sending to %1"), host), 2);
-                }));
-            }
-            m.push_back(MenuItem(fo::tr("Taildrop"), "", nullptr, sub));
-        }
+        auto share = share_menu(paths, target);
+        if (!share.empty())
+            m.push_back(MenuItem(fo::tr("Share"), "", nullptr, share));
     }
     if (for_folder && !trash_view)
         m.push_back(MenuItem(places::is_pinned(target) ? fo::tr("Unpin") : fo::tr("Pin"), "Ctrl+D",

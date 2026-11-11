@@ -5,6 +5,17 @@
 #   tools/gui-session.sh start [DISPLAY_NUMBER] [FOLDER]   -> prints the run dir
 #   tools/gui-session.sh stop RUN_DIR                     -> stops what start began
 #
+# Optional environment for start:
+#   FLO_SESSION_SETUP=SCRIPT  runs `SCRIPT RUN_DIR` after the fixtures are
+#                             made and before Flo starts; it may add files to
+#                             the run directory and lines to RUN_DIR/env.sh
+#                             (tools/session-fixtures.sh is one).
+#   FLO_SESSION_BUS=1         a private dbus-daemon (no services, its socket
+#                             in RUN_DIR/runtime/bus) as the session bus,
+#                             instead of no bus at all.
+# A RUN_DIR/run-media folder, if the setup makes one, is /run/media inside
+# the sandbox (for mountinfo fixtures of removable drives).
+#
 # The run directory (build/manual-runs/run-*) is 0700 and holds home/ with
 # the fixtures (Documents, Pictures/Lisbon 2026 with 50 photos, ...), tmp/,
 # the XDG directories, env.sh, sandbox.sh and the logs. Flo runs inside
@@ -61,6 +72,25 @@ exec bwrap --unshare-pid --die-with-parent \\
   --ro-bind "$build" "$build" --bind "$run" "$run" --chdir "$h" "\$@"
 EOF
   chmod 0700 "$run/sandbox.sh"
+  if [ "${FLO_SESSION_BUS:-}" = 1 ]; then
+    {
+      echo '<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"'
+      echo ' "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">'
+      echo "<busconfig><type>session</type><listen>unix:path=$run/runtime/bus</listen><auth>EXTERNAL</auth>"
+      echo '<policy context="default"><allow send_destination="*" eavesdrop="true"/><allow eavesdrop="true"/>'
+      echo '<allow own="*"/></policy></busconfig>'
+    } > "$run/dbus.conf"
+    dbus-daemon --config-file="$run/dbus.conf" --nofork --nopidfile > "$run/dbus.log" 2>&1 &
+    echo $! > "$run/dbus.pid"
+    echo "export DBUS_SESSION_BUS_ADDRESS=unix:path=$run/runtime/bus" >> "$run/env.sh"
+    sleep 0.3
+  fi
+  if [ -n "${FLO_SESSION_SETUP:-}" ]; then
+    "$FLO_SESSION_SETUP" "$run"
+  fi
+  if [ -d "$run/run-media" ]; then
+    sed -i "s|--bind \"$run\" \"$run\"|--bind \"$run\" \"$run\" --bind \"$run/run-media\" /run/media|" "$run/sandbox.sh"
+  fi
   Xvfb ":$disp" -screen 0 1440x900x24 -nolisten tcp > "$run/xvfb.log" 2>&1 &
   echo $! > "$run/xvfb.pid"
   sleep 1
@@ -73,7 +103,7 @@ EOF
   ;;
 stop)
   run=$2
-  for f in flo xvfb; do
+  for f in flo xvfb dbus; do
     [ -f "$run/$f.pid" ] && kill "$(cat "$run/$f.pid")" 2>/dev/null || true
   done
   ;;

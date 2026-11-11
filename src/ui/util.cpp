@@ -1,6 +1,7 @@
 #include "ui/util.h"
 
 #include "core/fsutil.h"
+#include "core/process.h"
 #include "core/trash.h"
 #include "core/uri.h"
 #include "core/xdg.h"
@@ -299,6 +300,32 @@ bool launch_app(const std::string &id, const std::vector<std::string> &paths) {
     g_list_free_full(files, g_object_unref);
     g_object_unref(info);
     return ok;
+}
+
+std::string set_default_app(const std::string &mime, const std::string &id) {
+    if (mime.empty() || id.empty())
+        return "No type to set a default for.";
+    if (!xdg::find_program("xdg-mime").empty()) {
+        RunOptions o;
+        o.timeout_ms = 10000;
+        ProcessResult r = run_process({"xdg-mime", "default", id, mime}, o);
+        if (r.ok())
+            return {};
+        std::string why = r.err;
+        while (!why.empty() && (why.back() == '\n' || why.back() == ' '))
+            why.pop_back();
+        return why.empty() ? "xdg-mime failed." : why;
+    }
+    GDesktopAppInfo *info = g_desktop_app_info_new(id.c_str());
+    if (!info)
+        return "That application is no longer installed.";
+    GError *err = nullptr;
+    bool ok = g_app_info_set_as_default_for_type(G_APP_INFO(info), mime.c_str(), &err);
+    std::string why = err && err->message ? err->message : "";
+    if (err)
+        g_error_free(err);
+    g_object_unref(info);
+    return ok ? std::string() : (why.empty() ? std::string("The default couldn't be changed.") : why);
 }
 
 std::string uri_list_for_drag(const std::vector<std::string> &paths) {
