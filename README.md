@@ -26,8 +26,21 @@ Its toolkit moved the same way:
 
 ## Status
 
-Early. The non-UI core is in place; the window is being built on top of it.
+Usable. The window covers Folio's everyday behavior; see
+[docs/FOLIO-PARITY.md](docs/FOLIO-PARITY.md) for what is still missing.
 
+- **Window** (`src/ui/`, on the
+  [lib-fltk-omarchy](https://github.com/avillagran/lib-fltk-omarchy)
+  toolkit): sidebar (home folders, pins from GTK bookmarks, Recents, Trash,
+  drives with eject, tailnet machines), breadcrumbs, grid (256 px
+  thumbnails), list and columns views (Ctrl+1/2/3), details pane (Ctrl+I),
+  split view (Ctrl+Alt+N, Ctrl+W), path entry with Tab completion (Ctrl+L),
+  `/` search, context menu (right click, Alt+Enter, Menu), drag and drop,
+  the SFTP password prompt in the window, file operations with progress and
+  conflict prompts, undo/redo toasts, `?` shortcuts overlay, and Folio's keys.
+  The live Omarchy theme and the toolkit's motion apply throughout.
+- **Preview** (Space) runs as its own process, `flo preview PATH`, so
+  decoding a large picture never grows the main window.
 - **flo-core** (`src/core/`, no FLTK): folder listing off the UI thread with
   Folio's sort modes and natural order, live reload, `/` search, the shared
   freedesktop thumbnail cache with sandboxed `flo-thumbnailer` workers, file
@@ -38,10 +51,41 @@ Early. The non-UI core is in place; the window is being built on top of it.
   status, `org.freedesktop.FileManager1`, and settings.
 - **CLI** for scripts and agents, no display needed:
   `flo list|info|thumbnail|trash|restore [--json] PATH`.
-- **GUI**: not built yet.
 
 See [docs/CORE.md](docs/CORE.md), [docs/THUMBNAILS.md](docs/THUMBNAILS.md)
 and [docs/FOLIO-PARITY.md](docs/FOLIO-PARITY.md).
+
+| Grid | Columns |
+|---|---|
+| ![Grid](docs/screenshots/grid.png) | ![Columns](docs/screenshots/columns.png) |
+| ![List](docs/screenshots/list.png) | ![Split view](docs/screenshots/split.png) |
+| ![Context menu](docs/screenshots/menu.png) | ![Conflict](docs/screenshots/conflict.png) |
+
+More in [docs/screenshots/](docs/screenshots/): search, path entry, rename,
+preview, trash, undo toast, empty folder, shortcuts overlay.
+
+## Memory
+
+PSS and RSS from `/proc/PID/smaps_rollup` (`tools/measure-mem.sh`), after
+10+ seconds idle, release build, FLTK linked statically, in a private Xvfb
+(1280x800 window, X11 backend, no session bus), with a folder of 50 photos
+(1600x1200 JPEG) open in the grid with the details pane:
+
+| State | flo PSS | flo RSS |
+|---|---|---|
+| Folder open, first screen of thumbnails, cold cache | 15.7 MiB | 30.5 MiB |
+| Same, restarted with a warm thumbnail cache | 15.4 MiB | 30.2 MiB |
+| After scrolling through all 50 thumbnails | 19.2 MiB | 34.0 MiB |
+
+Reported separately (child processes, gone when idle):
+
+| Process | PSS | RSS |
+|---|---|---|
+| `flo-thumbnailer` worker, while making thumbnails (up to 4; exit after 20 s idle) | ~1.0 MiB each | ~7.7 MiB each |
+| `flo preview` showing a 1600x1200 photo (exits when closed) | 24.0 MiB | 40.1 MiB |
+
+For reference: the Rust predecessor measured 19 MiB, a bare FLTK window
+about 9 MiB.
 
 ## Building
 
@@ -57,6 +101,16 @@ cmake -S . -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build
 ctest --test-dir build
 ```
+
+To install as a package, `cd packaging && makepkg -si` (desktop entry for
+`inode/directory`, icon, `flo` and `flo-thumbnailer`).
+
+### Checking the window
+
+`tools/gui-session.sh start` runs Flo in a private Xvfb inside bubblewrap
+with fixture data (a home with 50 photos) and prints the run directory;
+`tools/xdrive.py` sends keys and clicks and takes screenshots there, and
+`tools/gui-session.sh stop RUN_DIR` stops it. Nothing touches your home.
 
 Tests run in a fresh private directory under `build/test-runs/` with their
 own `HOME`, `TMPDIR` and XDG directories; they never touch your files.

@@ -1,26 +1,27 @@
 # Folio parity
 
 Folio (Omarchy's file manager) is the standard for behavior. This table
-tracks the non-UI part: what flo-core provides for each Folio feature. "UI"
-means the core piece exists and the window still has to use it.
+tracks each Folio feature in Flo: the core piece (flo-core) and the window
+(src/ui/). "Done" means both exist; screenshots of the window are in
+`docs/screenshots/`.
 
 | Folio feature | Flo status |
 |---|---|
-| Listing off the UI thread, folders first, natural sort | Core done (`Lister`) — UI |
-| Sort by name, kind, newest, oldest, size (saved name `modified`) | Core done (`SortMode`) — UI |
-| Hidden files toggle | Core done (`ListOptions::show_hidden`, setting `view.hidden`) — UI |
-| Folder item counts, counted lazily (visible first) | Core done (`Lister::count_items`) — UI |
-| Live reload, debounced 250 ms | Core done (`Watcher`) — UI |
-| Remembered recent listings for instant back/forward | Not yet (the UI can keep `ListingPtr`s) |
+| Listing off the UI thread, folders first, natural sort | Done (`Lister`) |
+| Sort by name, kind, newest, oldest, size (saved name `modified`) | Done (`SortMode`) |
+| Hidden files toggle | Done (`ListOptions::show_hidden`, setting `view.hidden`) |
+| Folder item counts, counted lazily (visible first) | Done (`Lister::count_items`) |
+| Live reload, debounced 250 ms | Done (`Watcher`) |
+| Remembered recent listings for instant back/forward | Not yet |
 | 50,000 entries in under a second | Done: 110–145 ms for 50k entries (test) |
-| Progressive listing of slow (SFTP) folders | Core done (snapshots after 150 ms) — UI |
+| Progressive listing of slow (SFTP) folders | Done (snapshots after 150 ms) |
 | Shared freedesktop thumbnail cache, failure markers | Done (`fail/flo/` instead of `fail/folio`) |
 | Thumbnailers run outside the UI process with limits | Done: `flo-thumbnailer` workers (Folio still runs in-process for images) |
 | Validate `Thumb::URI` on a hit | Done (also `Thumb::MTime`, `Thumb::Size`, chunk CRCs) |
 | Folder peek (two pictures in folder tiles) | Not yet |
-| Copy, cut, paste interoperable with GNOME/KDE | Core done (`clipboard`, `FileOps::paste`) — UI clipboard I/O |
+| Copy, cut, paste interoperable with GNOME/KDE | Done (`clipboard`, `FileOps::paste`); the window reads and writes the clipboard |
 | Pastes never overwrite (`name (copy).ext`) | Done (`free_name`) |
-| Conflict prompt (replace, keep both, skip, apply to all) | Core done (`ConflictPolicy::Ask`); Replace trashes the occupant |
+| Conflict prompt (replace, keep both, skip, apply to all) | Done (`ConflictPolicy::Ask`); Replace trashes the occupant |
 | Drop: move on the same drive, copy across | Done (`FileOps::drop`) |
 | Duplicate, rename, new folder ("New Folder", "New Folder 2") | Done |
 | Compress to zip (bsdtar, hidden temp folder, "Archive.zip") | Done |
@@ -39,13 +40,13 @@ means the core piece exists and the window still has to use it.
 | Host keys auto-accepted for tailnet peers only, password asked in the window | Done (questions for other hosts go to the UI too) |
 | `/` search: breadth first, same drive, no symlinked folders | Done (`Searcher`), streamed |
 | Search with plocate | Not yet (Folio plan phase 2) |
-| Views remembered (grid/list/columns), details pane, window size | Core done (`Settings`, `~/.config/flo/flo.conf`) — UI |
-| `org.freedesktop.FileManager1` | Done (`DBusService`) — UI handlers |
-| `folio <file>` opens its folder with the file selected | Done in `main.cpp` (forwarded to a running Flo) — GUI |
-| New windows in the running process (Ctrl+N) | Core done (single-instance name) — UI |
+| Views remembered (grid/list/columns), details pane, window size | Done (`Settings`, `~/.config/flo/flo.conf`) |
+| `org.freedesktop.FileManager1` | Done (`DBusService`); the window handles ShowFolders/ShowItems |
+| `folio <file>` opens its folder with the file selected | Done in `main.cpp` (forwarded to a running Flo) |
+| New windows in the running process (Ctrl+N) | Done (single-instance name) |
 | CLI `list|info|thumbnail|trash|restore --json` | Done (`flo list|info|thumbnail|trash|restore`, plus `trash --list`) |
-| Open With / default apps | Not yet in core (GIO `g_app_info_*`, small) |
+| Open With / default apps | Done in the window (context menu "Open With") |
 | Share via Dropbox link, LocalSend, Taildrop, terminal here | Not yet (simple child processes) |
-| Preview process (`folio preview`) | Not in scope of the core |
+| Preview process (`folio preview`) | Done: `flo preview PATH`, its own process |
 | Taildrive shares, MTP | Not yet |
-| Theme, translations, keyboard, `?` overlay | UI |
+| Theme, translations, keyboard, `?` overlay | Done (live theme, Folio's keys, `?`); strings go through `fo::tr`, no translation catalogs yet |
