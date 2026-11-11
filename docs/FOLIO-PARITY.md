@@ -18,7 +18,7 @@ tracks each Folio feature in Flo: the core piece (flo-core) and the window
 | Shared freedesktop thumbnail cache, failure markers | Done (`fail/flo/` instead of `fail/folio`) |
 | Thumbnailers run outside the UI process with limits | Done: `flo-thumbnailer` workers (Folio still runs in-process for images) |
 | Validate `Thumb::URI` on a hit | Done (also `Thumb::MTime`, `Thumb::Size`, chunk CRCs) |
-| Folder peek (two pictures in folder tiles) | Not yet |
+| Folder peek (two pictures of a folder) | Done: `summarize_folder` picks the first two pictures (natural order, by extension, none on network filesystems) with the item count; the grid draws them on the folder card from the shared cache's 256 px bucket (a few KB each in the bounded image LRU), and the preview shows them 220 x 165 as Folio's folder view does. Folio shows the peek only in its preview; Flo also puts it on the tiles (`docs/screenshots/folder-peek.png`) |
 | Copy, cut, paste interoperable with GNOME/KDE | Done (`clipboard`, `FileOps::paste`); the window reads and writes the clipboard |
 | Pastes never overwrite (`name (copy).ext`) | Done (`free_name`) |
 | Conflict prompt (replace, keep both, skip, apply to all) | Done (`ConflictPolicy::Ask`); Replace trashes the occupant |

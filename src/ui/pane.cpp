@@ -439,6 +439,7 @@ void Pane::navigate(const std::string &path, const std::string &select, bool his
     folder_ = p;
     model_.base = p;
     model_.entries.clear();
+    model_.peeks.clear();
     model_.error.clear();
     model_.loading = true;
     files()->reload(true);
@@ -595,14 +596,22 @@ void Pane::count_folders() {
             folders.push_back(model_.path(i));
     if (folders.empty() || in_recents())
         return;
-    lister_->count_items(folders, hidden_, [this](std::vector<std::pair<std::string, int>> batch) {
-        for (auto &b : batch) {
-            int at = model_.index_of_path(b.first);
-            if (at >= 0)
-                model_.entries[size_t(at)].item_count = b.second;
-        }
-        files()->redraw();
-    });
+    lister_->count_items(
+        folders, hidden_,
+        [this](std::vector<FolderSummary> batch) {
+            for (auto &b : batch) {
+                int at = model_.index_of_path(b.folder);
+                if (at < 0)
+                    continue;
+                model_.entries[size_t(at)].item_count = b.count;
+                if (b.peek.empty())
+                    model_.peeks.erase(b.folder);
+                else
+                    model_.peeks[b.folder] = std::move(b.peek);
+            }
+            files()->redraw();
+        },
+        2);
 }
 
 void Pane::watch() {

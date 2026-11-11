@@ -1,8 +1,10 @@
 #include "core/lister.h"
 #include "core/fsutil.h"
+#include "core/natural_sort.h"
 
 #include <cerrno>
 #include <chrono>
+#include <algorithm>
 #include <cstring>
 
 #include <dirent.h>
@@ -125,6 +127,70 @@ int count_items(const std::string &folder, bool show_hidden) {
     return count;
 }
 
+bool is_peek_picture(const char *name) {
+    const char *dot = std::strrchr(name, '.');
+    if (!dot || dot == name || !dot[1] || std::strlen(dot + 1) > 4)
+        return false;
+    char ext[5] = {0, 0, 0, 0, 0};
+    for (int i = 0; dot[1 + i]; ++i)
+        ext[i] = char(dot[1 + i] >= 'A' && dot[1 + i] <= 'Z' ? dot[1 + i] + 32 : dot[1 + i]);
+    for (const char *p : {"jpg", "jpeg", "png", "webp", "gif", "heic", "avif", "jxl"})
+        if (std::strcmp(ext, p) == 0)
+            return true;
+    return false;
+}
+
+FolderSummary summarize_folder(const std::string &folder, bool show_hidden, int peek) {
+    FolderSummary out;
+    out.folder = folder;
+    const int fd = ::open(folder.c_str(), O_RDONLY | O_DIRECTORY | O_CLOEXEC);
+    if (fd < 0)
+        return out;
+    DIR *dir = ::fdopendir(fd);
+    if (!dir) {
+        ::close(fd);
+        return out;
+    }
+    if (peek > 0 && remote_fd(fd))
+        peek = 0;
+    // The first picture names in natural order, kept as we go, with a few
+    // spare in case some turn out to be broken links or empty files.
+    std::vector<std::string> first;
+    const int keep = peek > 0 ? peek + 6 : 0;
+    int count = 0;
+    while (dirent *d = ::readdir(dir)) {
+        const char *n = d->d_name;
+        if (n[0] == '.' && (n[1] == '\0' || (n[1] == '.' && n[2] == '\0')))
+            continue;
+        if (!show_hidden && n[0] == '.')
+            continue;
+        ++count;
+        if (peek <= 0 || (d->d_type != DT_REG && d->d_type != DT_UNKNOWN && d->d_type != DT_LNK) ||
+            !is_peek_picture(n))
+            continue;
+        std::string name = n;
+        if (int(first.size()) == keep && !natural_less(name, first.back()))
+            continue;
+        auto at = std::upper_bound(first.begin(), first.end(), name, natural_less);
+        first.insert(at, std::move(name));
+        if (int(first.size()) > keep)
+            first.pop_back();
+    }
+    out.count = count;
+    EntryOptions eopt;
+    eopt.sniff = false;
+    for (const auto &name : first) {
+        if (int(out.peek.size()) == peek)
+            break;
+        Entry e;
+        // Only regular files (a link to one is fine); a vanished name is skipped.
+        if (stat_entry(fd, name, e, eopt) && !e.is_dir && !e.broken_link && e.size > 0)
+            out.peek.push_back(std::move(e));
+    }
+    ::closedir(dir);
+    return out;
+}
+
 Lister::Lister(EventQueue &queue) : poster_(queue.poster()) {}
 
 Lister::~Lister() {
@@ -172,15 +238,15 @@ void Lister::cancel_counts() {
     count_exec_.clear();
 }
 
-void Lister::count_items(std::vector<std::string> folders, bool show_hidden, CountCallback on_counts) {
+void Lister::count_items(std::vector<std::string> folders, bool show_hidden, CountCallback on_counts, int peek) {
     cancel_counts();
     count_cancel_ = CancelToken();
     auto token = count_cancel_;
     auto poster = poster_;
     auto weak = alive_.weak();
-    count_exec_.run([folders = std::move(folders), show_hidden, token, poster, weak, on_counts] {
+    count_exec_.run([folders = std::move(folders), show_hidden, token, poster, weak, on_counts, peek] {
         using clock = std::chrono::steady_clock;
-        std::vector<std::pair<std::string, int>> batch;
+        std::vector<FolderSummary> batch;
         auto flush = [&] {
             if (batch.empty() || token.cancelled())
                 return;
@@ -194,7 +260,7 @@ void Lister::count_items(std::vector<std::string> folders, bool show_hidden, Cou
         for (const auto &f : folders) {
             if (token.cancelled())
                 return;
-            batch.emplace_back(f, flo::count_items(f, show_hidden));
+            batch.push_back(summarize_folder(f, show_hidden, peek));
             if (clock::now() - last > std::chrono::milliseconds(40)) {
                 flush();
                 last = clock::now();

@@ -76,11 +76,12 @@ TEST(lister_async_and_counts) {
     });
     CHECK(pump_until(q, [&] { return result != nullptr; }));
     CHECK(result && result->entries.size() == 2);
-    std::vector<std::pair<std::string, int>> counts;
+    std::vector<FolderSummary> counts;
     lister.count_items({d + "/f1", d + "/f2", d + "/gone"}, false,
-                       [&](std::vector<std::pair<std::string, int>> b) { counts.insert(counts.end(), b.begin(), b.end()); });
+                       [&](std::vector<FolderSummary> b) { counts.insert(counts.end(), b.begin(), b.end()); });
     CHECK(pump_until(q, [&] { return counts.size() == 3; }));
-    CHECK(counts.size() == 3 && counts[0].second == 2 && counts[1].second == 0 && counts[2].second == -1);
+    CHECK(counts.size() == 3 && counts[0].count == 2 && counts[1].count == 0 && counts[2].count == -1);
+    CHECK(counts.size() == 3 && counts[0].folder == d + "/f1" && counts[0].peek.empty());
     // A newer request overtakes an older one: only the newer is delivered.
     int delivered = 0;
     std::string last;
@@ -90,6 +91,36 @@ TEST(lister_async_and_counts) {
     q.wait(100);
     q.dispatch();
     CHECK_EQ(delivered, 1);
+}
+
+TEST(folder_summary_peeks_first_two_pictures) {
+    const std::string d = private_dir("peek");
+    write_file(d + "/IMG_10.jpg", "x");
+    write_file(d + "/IMG_9.JPG", "x");
+    write_file(d + "/IMG_2.png", "x");
+    write_file(d + "/notes.txt", "x");
+    write_file(d + "/.hidden.jpg", "x");
+    write_file(d + "/empty.jpg", "");
+    ::mkdir((d + "/album.jpg").c_str(), 0700); // a folder named like a picture
+    CHECK(::symlink("IMG_10.jpg", (d + "/a-link.webp").c_str()) == 0);
+    CHECK(::symlink("missing.jpg", (d + "/broken.gif").c_str()) == 0);
+    FolderSummary s = summarize_folder(d, false);
+    CHECK_EQ(s.count, 8);
+    CHECK_EQ(s.peek.size(), std::size_t(2));
+    // Natural order: a-link.webp (a link to a picture is fine), IMG_2, IMG_9, IMG_10.
+    CHECK(s.peek.size() == 2 && s.peek[0].name == "a-link.webp" && s.peek[1].name == "IMG_2.png");
+    CHECK(s.peek.size() == 2 && s.peek[1].size == 1 && s.peek[1].mtime_ns > 0);
+    // The broken link and the folder never make it; with no room left the
+    // empty file (skipped) doesn't take a slot from a real picture either.
+    FolderSummary all = summarize_folder(d, true, 8);
+    CHECK_EQ(all.count, 9);
+    for (const auto &e : all.peek)
+        CHECK(e.name != "broken.gif" && e.name != "album.jpg" && e.name != "empty.jpg");
+    CHECK_EQ(all.peek.size(), std::size_t(5)); // .hidden, a-link, IMG_2, IMG_9, IMG_10
+    CHECK_EQ(summarize_folder(d, false, 0).peek.size(), std::size_t(0));
+    CHECK_EQ(summarize_folder(d + "/nope", false).count, -1);
+    CHECK(is_peek_picture("a.HEIC") && is_peek_picture("b.jxl") && !is_peek_picture("c.jpgx") &&
+          !is_peek_picture(".jpg") && !is_peek_picture("d.txt"));
 }
 
 TEST(listing_50k_entries_under_a_second) {

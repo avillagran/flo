@@ -3,6 +3,8 @@
 #include "ui/app.h"
 #include "ui/thumbs.h"
 
+#include "core/fsutil.h"
+
 #include "fltk-omarchy/icons.h"
 #include "fltk-omarchy/paint.h"
 #include "fltk-omarchy/text.h"
@@ -132,6 +134,7 @@ void FileView::draw_tile_item(int i, int X, int Y, int W, int H, const ItemState
                            : s.hover > 0 ? fo::mix(t.lighter_background(), t.foreground(), 0.06 * s.hover)
                                          : t.lighter_background();
         draw_folder_card(ax, ay, aw, ah, fill, t.accent(), lit ? (s.drop_target ? 2 : 1) : 0);
+        draw_peek(path, ax, ay, aw, ah);
     } else {
         bool crop = e.kind == Kind::Image || e.kind == Kind::Video;
         Fl_RGB_Image *img = App::get().thumbs().get(path, e, kGridPx, aw, ah, crop, this);
@@ -166,6 +169,29 @@ void FileView::draw_tile_item(int i, int X, int Y, int W, int H, const ItemState
     if (!sub.empty())
         fo::text::draw(sub, X + 14, ly + 3, W - 28, 14, t.secondary_foreground(), fo::text::REGULAR,
                        fo::text::size::SMALL - 1, FL_ALIGN_CENTER);
+}
+
+// A folder's peek: its first one or two pictures side by side on the card,
+// from the shared thumbnail cache (the grid's 256 px bucket, so opening the
+// folder finds them made), scaled to a few KB each.
+void FileView::draw_peek(const std::string &folder, int ax, int ay, int aw, int ah) {
+    auto it = model_->peeks.find(folder);
+    if (it == model_->peeks.end() || it->second.empty())
+        return;
+    const auto &pics = it->second;
+    const int tab_h = std::max(5, ah * 6 / 92), inset = std::max(5, aw * 7 / 128);
+    const int bx = ax + aw * 4 / 128 + inset, bw = aw - 2 * (aw * 4 / 128) - 2 * inset;
+    const int by = ay + tab_h + inset, bh = ah - tab_h - 2 * inset;
+    const int n = int(std::min<std::size_t>(2, pics.size())), gap = 4;
+    const int pw = n == 1 ? bw : (bw - gap) / 2;
+    if (pw < 8 || bh < 8)
+        return;
+    for (int k = 0; k < n; ++k) {
+        const Entry &pe = pics[size_t(k)];
+        Fl_RGB_Image *img = App::get().thumbs().get(path_join(folder, pe.name), pe, kGridPx, pw, bh, true, this);
+        if (img)
+            img->draw(bx + k * (pw + gap) + (pw - img->w()) / 2, by + (bh - img->h()) / 2);
+    }
 }
 
 void FileView::draw_row_item(int i, int X, int Y, int W, int H, const ItemState &s) {

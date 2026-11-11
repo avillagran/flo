@@ -8,6 +8,7 @@
 
 #include <functional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace flo::ui {
@@ -23,6 +24,9 @@ struct FolderModel {
     std::vector<Entry> entries;
     bool loading = false;
     std::string error;
+    // Folder tiles' picture peeks, by the folder's absolute path (filled
+    // with the item counts; names inside are relative to that folder).
+    std::unordered_map<std::string, std::vector<Entry>> peeks;
 
     std::string path(int i) const;
     int index_of_name(const std::string &name) const; // the entry's own name

@@ -44,6 +44,20 @@ Listing list_folder(const std::string &folder, const ListOptions &options, const
 // Entries in `folder`, or -1 when it can't be read. Hidden ones only when shown.
 int count_items(const std::string &folder, bool show_hidden);
 
+// A folder's tile: how many entries it holds and a peek of its pictures
+// (Folio's FolderModel::summarize): the first `peek` pictures in natural
+// name order, by extension (jpg, jpeg, png, webp, gif, heic, avif, jxl),
+// stat'ed so the thumbnail cache can check them. No peek on network
+// filesystems, where thumbnailing would pull whole files over the wire.
+struct FolderSummary {
+    std::string folder;      // absolute path asked about
+    int count = -1;          // entries, or -1 when unreadable
+    std::vector<Entry> peek; // names are relative to `folder`
+};
+FolderSummary summarize_folder(const std::string &folder, bool show_hidden, int peek = 2);
+// Whether a file name is one of the pictures a folder peek shows.
+bool is_peek_picture(const char *name);
+
 class Lister {
 public:
     explicit Lister(EventQueue &queue);
@@ -58,11 +72,11 @@ public:
     void cancel();
     uint64_t generation() const { return generation_; }
 
-    // Counts the items inside each folder (visible tiles first: pass them in
-    // the order wanted). A new request replaces the pending one. Results
-    // arrive in batches as (absolute folder path, count or -1).
-    using CountCallback = std::function<void(std::vector<std::pair<std::string, int>>)>;
-    void count_items(std::vector<std::string> folders, bool show_hidden, CountCallback on_counts);
+    // Summarizes each folder (visible tiles first: pass them in the order
+    // wanted): its item count and, with `peek` > 0, its first pictures. A new
+    // request replaces the pending one. Results arrive in batches.
+    using CountCallback = std::function<void(std::vector<FolderSummary>)>;
+    void count_items(std::vector<std::string> folders, bool show_hidden, CountCallback on_counts, int peek = 0);
     void cancel_counts();
 
 private:

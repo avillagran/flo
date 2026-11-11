@@ -40,6 +40,7 @@ public:
 private:
     void draw_tile_item(int i, int x, int y, int w, int h, const ItemState &s);
     void draw_row_item(int i, int x, int y, int w, int h, const ItemState &s);
+    void draw_peek(const std::string &folder, int ax, int ay, int aw, int ah);
     void draw_stand_in(const Entry &e, int x, int y, int w, int h, int &dx, int &dy, int &dw, int &dh);
     FolderModel *model_;
     Mode mode_ = Mode::Grid;

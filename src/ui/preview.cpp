@@ -101,7 +101,29 @@ class PreviewWindow;
 class Stage : public Fl_Widget {
 public:
     Stage(int x, int y, int w, int h) : Fl_Widget(x, y, w, h) { box(FL_NO_BOX); }
-    ~Stage() override { delete img_; }
+    ~Stage() override {
+        delete img_;
+        clear_peek();
+    }
+    // A folder's peek: up to two of its pictures (Folio's folder view).
+    void clear_peek() {
+        for (auto *i : peek_)
+            delete i;
+        peek_.clear();
+        redraw();
+    }
+    // Pictures keep their folder order whichever thumbnail arrives first.
+    void add_peek(std::size_t slot, Fl_RGB_Image *img) {
+        if (slot >= 2) {
+            delete img;
+            return;
+        }
+        if (peek_.size() <= slot)
+            peek_.resize(slot + 1, nullptr);
+        delete peek_[slot];
+        peek_[slot] = img;
+        redraw();
+    }
     void set_image(Fl_RGB_Image *img) {
         delete img_;
         img_ = img;
@@ -135,6 +157,24 @@ public:
             int dw = std::max(1, int(iw * f)), dh = std::max(1, int(ih * f));
             img_->scale(dw, dh, 0, 1);
             img_->draw(x() + (w() - dw) / 2 + pan_x_, y() + (h() - dh) / 2 + pan_y_);
+        } else if (entry_.is_dir && !peek_.empty()) {
+            // Pictures 220 x 165, filled and cropped, 16 apart.
+            const int pw = 220, ph = 165, gap = 16;
+            const int n = int(std::count_if(peek_.begin(), peek_.end(), [](Fl_RGB_Image *i) { return i != nullptr; }));
+            int px = x() + (w() - (n * pw + (n - 1) * gap)) / 2, py = y() + h() / 2 - ph / 2 - 30;
+            for (auto *img : peek_) {
+                if (!img)
+                    continue;
+                double f = std::max(double(pw) / img->data_w(), double(ph) / img->data_h());
+                int dw = std::max(1, int(img->data_w() * f)), dh = std::max(1, int(img->data_h() * f));
+                img->scale(dw, dh, 0, 1);
+                fl_push_clip(px, py, pw, ph);
+                img->draw(px + (pw - dw) / 2, py + (ph - dh) / 2);
+                fl_pop_clip();
+                px += pw + gap;
+            }
+            fo::text::draw(note_, x(), py + ph + 18, w(), 24, t.secondary_foreground(), fo::text::REGULAR,
+                           fo::text::size::BODY, FL_ALIGN_CENTER);
         } else if (entry_.is_dir) {
             draw_folder_card(x() + w() / 2 - 128, y() + h() / 2 - 120, 256, 184, t.lighter_background(), t.accent(), 0);
             fo::text::draw(note_, x(), y() + h() / 2 + 80, w(), 24, t.secondary_foreground(), fo::text::REGULAR,
@@ -171,6 +211,7 @@ public:
 
 private:
     Fl_RGB_Image *img_ = nullptr;
+    std::vector<Fl_RGB_Image *> peek_;
     Entry entry_;
     std::string note_;
     double zoom_ = 1;
@@ -271,11 +312,14 @@ public:
         }
         copy_label(e.name.c_str());
         stage_->set_image(nullptr);
+        stage_->clear_peek();
         text_->hide();
         stage_->show();
         std::string note;
         if (e.is_dir) {
-            note = fo::trn("%n items", count_items(path, hidden_));
+            FolderSummary sum = summarize_folder(path, hidden_, 2);
+            note = fo::trn("%n items", sum.count);
+            load_peek(sum);
         } else if (e.kind == Kind::Text || (e.mime && std::strncmp(e.mime, "text/", 5) == 0)) {
             std::string t = read_text(path, 512 * 1024);
             if (!looks_binary(t)) {
@@ -312,6 +356,23 @@ public:
                            });
         } else {
             load_thumbnail();
+        }
+    }
+
+    // A folder's first pictures, from the shared cache's 256 px bucket.
+    void load_peek(const FolderSummary &sum) {
+        uint64_t gen = generation_;
+        for (std::size_t k = 0; k < sum.peek.size(); ++k) {
+            const Entry &pe = sum.peek[k];
+            thumbs_->request(path_join(sum.folder, pe.name), 256, [this, gen, k](const ThumbnailResult &r) {
+                if (gen != generation_ || r.status != ThumbnailStatus::Ready)
+                    return;
+                auto *img = new Fl_PNG_Image(r.thumbnail.c_str());
+                if (img->fail())
+                    delete img;
+                else
+                    stage_->add_peek(k, img);
+            }, pe.mime);
         }
     }
 
