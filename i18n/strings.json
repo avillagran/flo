@@ -104,6 +104,10 @@
   "plural": true
  },
  {
+  "source": "%n files",
+  "plural": true
+ },
+ {
   "source": "%n items",
   "plural": true
  },
@@ -249,6 +253,10 @@
  },
  {
   "source": "Calculate the folder's size",
+  "plural": false
+ },
+ {
+  "source": "Calculating sizes…",
   "plural": false
  },
  {

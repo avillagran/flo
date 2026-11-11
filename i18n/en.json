@@ -2,6 +2,7 @@
  "%n commands": {"one": "%n command", "other": "%n commands"},
  "%n entries": {"one": "%n entry", "other": "%n entries"},
  "%n favorites": {"one": "%n favorite", "other": "%n favorites"},
+ "%n files": {"one": "%n file", "other": "%n files"},
  "%n items": {"one": "%n item", "other": "%n items"},
  "%n items removed from starred": {"one": "%n item removed from starred", "other": "%n items removed from starred"},
  "%n items starred": {"one": "%n item starred", "other": "%n items starred"},

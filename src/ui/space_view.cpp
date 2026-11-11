@@ -7,6 +7,7 @@
 #include "ui/main_window.h"
 #include "ui/pane.h"
 #include "ui/sizes.h"
+#include "ui/tile_colors.h"
 
 #include "fltk-omarchy/i18n.h"
 #include "fltk-omarchy/icons.h"
@@ -24,89 +25,151 @@ namespace flo::ui {
 
 namespace {
 
-fo::Rgb block_color(const std::string &name, bool dir) {
-    const fo::Theme &t = fo::theme();
+tile_colors::Rgb8 rgb8(fo::Rgb c) { return {c.r, c.g, c.b}; }
+
+// Files' rectangle rounding: the edges, not the size, so neighbours meet.
+void round_rect(const fo::RectF &r, int &x, int &y, int &w, int &h) {
+    x = int(std::lround(r.x));
+    y = int(std::lround(r.y));
+    w = int(std::lround(r.x + r.w)) - x;
+    h = int(std::lround(r.y + r.h)) - y;
+}
+
+fo::RectF rect_f(int x, int y, int w, int h) { return fo::RectF{double(x), double(y), double(w), double(h)}; }
+
+// A quarter-size rectangle at the centre: the zoom anchor when the
+// folder's block is not known.
+fo::RectF centre(const fo::RectF &full) {
+    int fx = int(full.x), fy = int(full.y), fw = int(full.w), fh = int(full.h);
+    return rect_f(fx + fw * 3 / 8, fy + fh * 3 / 8, std::max(1, fw / 4), std::max(1, fh / 4));
+}
+
+// Files' Grid glyph of a kind (grid_view.rs type_glyph).
+const char *tile_glyph(bool dir, int kind) {
     if (dir)
-        return t.blue();
-    fo::Rgb cycle[] = {t.magenta(), t.cyan(), t.yellow(), t.green(), t.blue(), t.orange()};
-    unsigned h = 2166136261u;
-    for (char c : name)
-        h = (h ^ static_cast<unsigned char>(c)) * 16777619u;
-    return cycle[h % 6];
+        return "folder";
+    switch (Kind(kind)) {
+    case Kind::Image: return "image";
+    case Kind::Video: return "video";
+    case Kind::Audio: return "music";
+    case Kind::Pdf: return fo::glyph::available() ? "pdf" : "file-text";
+    default: return "file";
+    }
+}
+
+// Files' corner unit: 1 with rounded corners, 0 square.
+int corner() { return fo::theme().radius() > 0 ? 1 : 0; }
+
+// Files' labelled-tile rows and type icon (space_map_view.rs).
+constexpr int kNameBottom = 31, kSizeTop = 32, kIconMin = 18, kIconMax = 64;
+
+bool icon_layout(int x, int y, int w, int h, int &ix, int &iy, int &iw, int &ih, int &size) {
+    if (w < SpaceView::kLabelW || h < SpaceView::kLabelH)
+        return false;
+    int top = y + kNameBottom;
+    int bottom = std::max(y + h - kSizeTop, y + 30);
+    ih = bottom - top - 4;
+    iw = w - 20;
+    size = int(std::lround(std::min(ih, iw) * 0.8));
+    if (size < kIconMin)
+        return false;
+    size = std::min(size, kIconMax);
+    ix = x + 10;
+    iy = top + 2;
+    return true;
 }
 } // namespace
+
+fo::Rgb SpaceView::tile_fill(const std::string &name) {
+    const fo::Theme &t = fo::theme();
+    const fo::Rgb colors[] = {t.blue(), t.cyan(), t.magenta(), t.green(), t.yellow()};
+    return colors[tile_colors::index(name)];
+}
+
+fo::Rgb SpaceView::readable(fo::Rgb fill) {
+    const fo::Theme &t = fo::theme();
+    tile_colors::Rgb8 c = tile_colors::readable(rgb8(fill), rgb8(t.color("darker_background")), rgb8(t.bright_foreground()));
+    return fo::Rgb(c.r, c.g, c.b);
+}
 
 SpaceView::SpaceView(int x, int y, int w, int h, Pane *pane) : Fl_Widget(x, y, w, h), pane_(pane) {
     box(FL_NO_BOX);
     set_visible_focus();
 }
 
-std::vector<SpaceView::Block> SpaceView::squarify(const std::vector<std::pair<int, uint64_t>> &sizes, int W, int H) {
+std::vector<SpaceView::Block> SpaceView::treemap(const std::vector<std::pair<int, uint64_t>> &sizes, int W, int H) {
+    // Files' weighted binary treemap (files_core space_map.rs layout): split
+    // the run near half its bytes along the longer side, the smaller part
+    // at the low edge; edges are rounded so neighbours meet.
     std::vector<Block> out;
-    double total = 0;
-    for (const auto &s : sizes)
-        total += double(s.second);
-    if (total <= 0 || W <= 0 || H <= 0)
+    if (sizes.empty() || W <= 0 || H <= 0)
         return out;
-    double scale = double(W) * double(H) / total;
-    double rx = 0, ry = 0, rw = W, rh = H;
-    size_t i = 0;
-    auto worst = [](const std::vector<double> &row, double side) {
-        double sum = 0, mx = 0, mn = 1e300;
-        for (double a : row) {
-            sum += a;
-            mx = std::max(mx, a);
-            mn = std::min(mn, a);
-        }
-        if (sum <= 0 || mn <= 0)
-            return 1e300;
-        double s2 = side * side, sum2 = sum * sum;
-        return std::max(s2 * mx / sum2, sum2 / (s2 * mn));
+    std::vector<std::pair<int, uint64_t>> items = sizes;
+    std::stable_sort(items.begin(), items.end(), [](const auto &a, const auto &b) {
+        return a.second != b.second ? a.second > b.second : a.first < b.first;
+    });
+    std::vector<uint64_t> prefix(1, 0);
+    for (const auto &it : items)
+        prefix.push_back(prefix.back() + it.second);
+    if (prefix.back() == 0)
+        return out;
+    struct Work {
+        size_t start, end;
+        double x0, y0, x1, y1;
     };
-    while (i < sizes.size()) {
-        double side = std::min(rw, rh);
-        std::vector<double> row;
-        size_t j = i;
-        while (j < sizes.size()) {
-            std::vector<double> next = row;
-            next.push_back(double(sizes[j].second) * scale);
-            if (!row.empty() && worst(next, side) > worst(row, side))
-                break;
-            row = std::move(next);
-            ++j;
-        }
-        double sum = 0;
-        for (double a : row)
-            sum += a;
-        bool horizontal = rw >= rh; // lay the row along the short side
-        double thick = side > 0 ? sum / side : 0;
-        double pos = 0;
-        for (size_t k = 0; k < row.size(); ++k) {
-            double len = thick > 0 ? row[k] / thick : 0;
+    std::vector<Work> stack{{0, items.size(), 0, 0, double(W), double(H)}};
+    while (!stack.empty()) {
+        Work k = stack.back();
+        stack.pop_back();
+        if (k.end - k.start == 1) {
             Block b;
-            b.index = sizes[i + k].first;
-            b.bytes = sizes[i + k].second;
-            if (horizontal) {
-                b.x = int(std::lround(rx)), b.y = int(std::lround(ry + pos));
-                b.w = int(std::lround(rx + thick)) - b.x;
-                b.h = int(std::lround(ry + pos + len)) - b.y;
-            } else {
-                b.x = int(std::lround(rx + pos)), b.y = int(std::lround(ry));
-                b.w = int(std::lround(rx + pos + len)) - b.x;
-                b.h = int(std::lround(ry + thick)) - b.y;
-            }
-            pos += len;
+            b.index = items[k.start].first;
+            b.bytes = items[k.start].second;
+            b.x = int(std::lround(k.x0)), b.y = int(std::lround(k.y0));
+            b.w = int(std::lround(k.x1)) - b.x, b.h = int(std::lround(k.y1)) - b.y;
             out.push_back(b);
+            continue;
         }
+        const uint64_t sum = prefix[k.end] - prefix[k.start];
+        auto weight = [&](size_t end) { return prefix[end] - prefix[k.start]; };
+        auto balance = [&](size_t end) {
+            uint64_t left = weight(end), right = sum - left;
+            return left > right ? left - right : right - left;
+        };
+        size_t low = k.start + 1, high = k.end - 1;
+        while (low < high) {
+            size_t middle = low + (high - low) / 2;
+            if (weight(middle) < sum / 2)
+                low = middle + 1;
+            else
+                high = middle;
+        }
+        size_t split = low > k.start + 1 && balance(low - 1) <= balance(low) ? low - 1 : low;
+        const uint64_t left_w = weight(split), right_w = sum - left_w;
+        const bool left_small = left_w <= right_w;
+        const uint64_t smaller = std::min(left_w, right_w);
+        const bool horizontal = k.x1 - k.x0 >= k.y1 - k.y0;
+        const double a0 = horizontal ? k.x0 : k.y0, a1 = horizontal ? k.x1 : k.y1;
+        const double cut = a0 + (a1 - a0) * (double(smaller) / double(sum));
+        Work left = k, right = k;
+        left.end = split;
+        right.start = split;
         if (horizontal) {
-            rx += thick;
-            rw -= thick;
+            if (left_small)
+                left.x1 = cut, right.x0 = cut;
+            else
+                right.x1 = cut, left.x0 = cut;
+        } else if (left_small) {
+            left.y1 = cut, right.y0 = cut;
         } else {
-            ry += thick;
-            rh -= thick;
+            right.y1 = cut, left.y0 = cut;
         }
-        i = j;
+        stack.push_back(right);
+        stack.push_back(left);
     }
+    std::stable_sort(out.begin(), out.end(), [](const Block &a, const Block &b) {
+        return a.bytes != b.bytes ? a.bytes > b.bytes : a.index < b.index;
+    });
     return out;
 }
 
@@ -152,9 +215,9 @@ void SpaceView::layout() {
     // are too small for a label (they get a row too, as in Files).
     auto place = [&](size_t rows) {
         int reserve = rows == 0 ? 26 : 56 + kRow * int(std::min<size_t>(rows, kListRows));
-        map_x_ = x(), map_y_ = y() + kToolbar, map_w_ = std::max(0, w() - 4);
+        map_x_ = x(), map_y_ = y() + kToolbar, map_w_ = std::max(0, w());
         map_h_ = std::max(0, h() - kToolbar - reserve);
-        blocks_ = squarify(sizes, map_w_, map_h_);
+        blocks_ = treemap(sizes, map_w_, map_h_);
     };
     auto small_rows = [&] {
         std::vector<Row> out;
@@ -167,8 +230,9 @@ void SpaceView::layout() {
     std::vector<Row> small = small_rows();
     place(zero.size() + small.size());
     small = small_rows();
-    rows_ = std::move(small);
-    rows_.insert(rows_.end(), zero.begin(), zero.end());
+    // Files lists what has no area first, then the blocks too small for a label.
+    rows_ = std::move(zero);
+    rows_.insert(rows_.end(), small.begin(), small.end());
     list_y_ = map_y_ + map_h_;
     row_top_ = std::clamp(row_top_, 0, std::max(0, int(rows_.size()) - kListRows));
     int cur = pane_->current();
@@ -181,6 +245,8 @@ void SpaceView::layout() {
     if (row_focus_ >= 0 && rows_[size_t(row_focus_)].index != cur)
         row_focus_ = -1;
     hover_ = -1;
+    layout_path_ = m.base;
+    ++layout_gen_;
     layout_buttons();
 }
 
@@ -324,6 +390,10 @@ void SpaceView::focus_block(int b) {
 
 int SpaceView::handle(int event) {
     switch (event) {
+    case FL_HIDE:
+        // Another view takes over: a later return is not a navigation.
+        leave();
+        return Fl_Widget::handle(event);
     case FL_FOCUS:
     case FL_UNFOCUS:
         redraw();
@@ -436,8 +506,347 @@ int SpaceView::handle(int event) {
     return 0;
 }
 
+// --- Motion (space_map_zoom.rs) ------------------------------------------------------
+
+SpaceView::Affine SpaceView::Affine::between(const fo::RectF &from, const fo::RectF &to) {
+    Affine a;
+    a.sx = std::fabs(from.w) > 1e-9 ? to.w / from.w : 1;
+    a.sy = std::fabs(from.h) > 1e-9 ? to.h / from.h : 1;
+    a.tx = to.x - from.x * a.sx;
+    a.ty = to.y - from.y * a.sy;
+    return a;
+}
+
+fo::RectF SpaceView::Affine::apply(const fo::RectF &r) const {
+    return fo::RectF{r.x * sx + tx, r.y * sy + ty, r.w * sx, r.h * sy};
+}
+
+fo::RectF SpaceView::Plan::place(const fo::RectF &r) const {
+    fo::RectF f = live.apply(r);
+    if (reveal >= 1)
+        return f;
+    double cx = f.x + f.w / 2, cy = f.y + f.h / 2;
+    return fo::RectF{cx - f.w * reveal / 2, cy - f.h * reveal / 2, f.w * reveal, f.h * reveal};
+}
+
+const SpaceView::Tile *SpaceView::Snapshot::find(const std::string &name) const {
+    for (const auto &t : tiles)
+        if (t.name == name)
+            return &t;
+    return nullptr;
+}
+
+SpaceView::Tile SpaceView::tile_of(const Block &b) const {
+    const FolderModel &m = pane_->model();
+    const Entry &e = m.entries[size_t(b.index)];
+    Tile t;
+    t.x = b.x, t.y = b.y, t.w = b.w, t.h = b.h;
+    t.name = display_name(e);
+    t.dir = e.is_dir;
+    t.kind = int(e.kind);
+    t.bytes = b.bytes;
+    if (e.is_dir)
+        if (const FolderSizes::Result *r = App::get().sizes().get(m.path(b.index)))
+            t.files = r->files;
+    return t;
+}
+
+void SpaceView::remember(const std::string &path) {
+    fo::RectF map = rect_f(map_x_, map_y_, map_w_, map_h_);
+    if (!cache_.empty() && cache_.front().path == path && cache_.front().gen == layout_gen_ &&
+        cache_.front().map == map)
+        return;
+    cache_.erase(std::remove_if(cache_.begin(), cache_.end(), [&](const Snapshot &s) { return s.path == path; }),
+                 cache_.end());
+    Snapshot s;
+    s.path = path;
+    s.gen = layout_gen_;
+    s.map = map;
+    // The layout lists larger blocks first: the biggest are kept.
+    for (size_t b = 0; b < blocks_.size() && s.tiles.size() < kSnapshotTiles; ++b)
+        if (blocks_[b].w > 0 && blocks_[b].h > 0)
+            s.tiles.push_back(tile_of(blocks_[b]));
+    cache_.push_front(std::move(s));
+    while (cache_.size() > kSnapshots)
+        cache_.pop_back();
+}
+
+const SpaceView::Snapshot *SpaceView::snapshot(const std::string &path) const {
+    for (const auto &s : cache_)
+        if (s.path == path)
+            return &s;
+    return nullptr;
+}
+
+void SpaceView::leave() {
+    shown_.clear();
+    zoom_.active = false;
+    reveal_pending_ = false;
+    animating_ = false;
+    ring_valid_ = false;
+}
+
+void SpaceView::start(const std::string &previous, const std::string &path, bool ready) {
+    bool in;
+    std::string child;
+    if (path_dirname(path) == previous && path != previous)
+        in = true, child = path;
+    else if (path_dirname(previous) == path && path != previous)
+        in = false, child = previous;
+    else
+        return;
+    const std::string name = path_basename(child);
+    if (name.empty())
+        return;
+    const Snapshot *parent = snapshot(path_dirname(child));
+    const Snapshot *from = in ? parent : snapshot(child);
+    if (!in && !from && !parent)
+        return; // nothing painted on either side: nothing to zoom
+    Zoom &z = zoom_;
+    z = Zoom();
+    z.in = in;
+    if (from)
+        z.has_from = true, z.from = *from;
+    if (!in && parent)
+        z.has_parent = true, z.parent = *parent;
+    const Tile *t = parent ? parent->find(name) : nullptr;
+    if (t) {
+        z.has_block = true;
+        z.block = rect_f(int(parent->map.x) + t->x, int(parent->map.y) + t->y, t->w, t->h);
+        z.tile = *t;
+    } else {
+        z.tile.name = name;
+        z.tile.dir = true;
+    }
+    came_in_ = in;
+    z.active = true;
+    z.t.jump(0);
+    z.t.set(1.0, kZoomMs, fo::anim::Ease::OutCubic);
+    if (!ready) {
+        reveal_path_ = path;
+        reveal_pending_ = true;
+        reveal_ = fo::Anim<double>();
+    }
+}
+
+bool SpaceView::plan(const std::string &path, const fo::RectF &full, bool ready, Plan &out) {
+    if (shown_ != path) {
+        std::string previous = shown_;
+        shown_ = path;
+        zoom_.active = false;
+        reveal_pending_ = false;
+        if (!previous.empty() && fo::anim::enabled())
+            start(previous, path, ready);
+    }
+    out = Plan();
+    if (reveal_pending_ && reveal_path_ == path && ready) {
+        if (!reveal_.initialized()) {
+            reveal_.jump(0);
+            reveal_.set(1.0, kRevealMs, fo::anim::Ease::OutCubic);
+        }
+        double v = reveal_.value();
+        if (!reveal_.running()) {
+            reveal_pending_ = false;
+        } else {
+            out.reveal = std::clamp(v, 0.0, 1.0);
+            animating_ = true;
+        }
+    }
+    if (zoom_.active) {
+        double v = zoom_.t.value();
+        if (!zoom_.t.running()) {
+            zoom_.active = false;
+        } else {
+            v = std::clamp(v, 0.0, 1.0);
+            fo::RectF block = zoom_.has_block ? zoom_.block : centre(full);
+            if (zoom_.in) {
+                fo::RectF frame = fo::lerp(block, full, v);
+                out.live = Affine::between(full, frame);
+                out.back = Affine::between(block, frame);
+                out.has_back = true;
+                out.frame = frame;
+            } else {
+                fo::RectF frame = fo::lerp(full, block, v);
+                Affine around = Affine::between(block, frame);
+                out.live = around;
+                out.back = around;
+                out.has_back = true;
+                if (zoom_.has_from) {
+                    out.front = Affine::between(zoom_.from.map, frame);
+                    out.has_front = true;
+                }
+                out.frame = frame;
+            }
+            out.has_frame = true;
+            out.moving = true;
+            animating_ = true;
+        }
+    }
+    out.outline = !ready && !zoom_.active && reveal_pending_ && reveal_path_ == path && came_in_;
+    return out.moving || out.outline || out.reveal < 1;
+}
+
+void SpaceView::paint_back(const Plan &plan, bool ready) {
+    if (!zoom_.active)
+        return;
+    const Snapshot *source = zoom_.in ? (zoom_.has_from ? &zoom_.from : nullptr)
+                                      : (zoom_.has_parent && !ready ? &zoom_.parent : nullptr);
+    if (source && plan.has_back)
+        for (const auto &t : source->tiles) {
+            if (t.name == zoom_.tile.name)
+                continue;
+            int x, y, w, h;
+            round_rect(plan.back.apply(rect_f(int(source->map.x) + t.x, int(source->map.y) + t.y, t.w, t.h)), x, y,
+                       w, h);
+            draw_tile(x, y, w, h, t, false, false, false);
+        }
+    if (plan.has_frame && (!zoom_.in || !ready)) {
+        int x, y, w, h;
+        round_rect(plan.frame, x, y, w, h);
+        draw_tile(x, y, w, h, zoom_.tile, false, false, false);
+    }
+}
+
+void SpaceView::paint_front(const Plan &plan) {
+    if (!zoom_.active || !plan.has_front || !zoom_.has_from)
+        return;
+    const Snapshot &s = zoom_.from;
+    for (const auto &t : s.tiles) {
+        int x, y, w, h;
+        round_rect(plan.front.apply(rect_f(int(s.map.x) + t.x, int(s.map.y) + t.y, t.w, t.h)), x, y, w, h);
+        draw_tile(x, y, w, h, t, false, false, false);
+    }
+}
+
+void SpaceView::draw_ring(const fo::RectF *target, int radius) {
+    // Files' focus ring glides between blocks and rows of the same folder,
+    // and jumps when nothing was focused last frame or the folder changed.
+    if (!target) {
+        ring_valid_ = false;
+        return;
+    }
+    const std::string key = pane_->folder();
+    if (ring_valid_ && ring_key_ == key)
+        ring_.set(*target, kRingMs, fo::anim::Ease::OutCubic);
+    else
+        ring_.jump(*target);
+    ring_key_ = key;
+    ring_valid_ = true;
+    fo::RectF at = ring_.value();
+    if (ring_.running())
+        animating_ = true;
+    int x, y, w, h;
+    round_rect(at, x, y, w, h);
+    if (w > 4 && h > 4)
+        fo::paint::round_frame(x, y, w, h, radius, 2, fo::theme().accent());
+}
+
+// --- Painting --------------------------------------------------------------------------
+
+void SpaceView::draw_tile(int x, int y, int w, int h, const Tile &t, bool selected, bool hovered, bool focused) {
+    if (w <= 0 || h <= 0)
+        return;
+    const int rad = corner();
+    const fo::Rgb fill = tile_fill(t.name), fg = readable(fill);
+    // Marks and hover are the light band; keyboard focus is the accent ring
+    // drawn over the outer gap, so focus alone never looks marked.
+    if (selected || hovered)
+        fo::paint::round_fill(x + 1, y + 1, std::max(0, w - 2), std::max(0, h - 2), 7 * rad, fg);
+    const int gap = focused ? 5 : (selected || hovered) ? 3 : 1;
+    const int ix = x + gap, iy = y + gap, iw = std::max(0, w - 2 * gap), ih = std::max(0, h - 2 * gap);
+    if (iw <= 0 || ih <= 0)
+        return;
+    fo::paint::round_fill(ix, iy, iw, ih, 6 * rad, fill);
+    if (w < kLabelW || h < kLabelH)
+        return;
+    fl_push_clip(ix, iy, iw, ih);
+    const char *glyph = tile_glyph(t.dir, t.kind);
+    int gx, gy, gw, gh, gs;
+    bool icon = icon_layout(x, y, w, h, gx, gy, gw, gh, gs);
+    int tx = x + 10;
+    if (!icon) {
+        // No room for the icon between the rows: a small glyph leads the name.
+        fo::icon::draw(glyph, tx, y + 7 + (24 - 13) / 2, 13, fg);
+        tx += 13 + 8;
+    }
+    fo::text::draw(t.name, tx, y + 7, std::max(0, x + w - 10 - tx), 24, fg, fo::text::REGULAR, 13);
+    if (icon)
+        fo::icon::draw(glyph, gx + (gw - gs) / 2, gy + (gh - gs) / 2, gs, fg);
+    std::string size = si_size(t.bytes);
+    if (t.dir && w > 220)
+        size += " \xC2\xB7 " + fo::trn("%n files", (long long)t.files);
+    fo::text::draw(size, x + 10, std::max(y + h - kSizeTop, y + 30), w - 20, 24, fg, fo::text::REGULAR, 12);
+    fl_pop_clip();
+}
+
+bool SpaceView::label_fits(const Tile &t) const {
+    if (t.w < kLabelW || t.h < kLabelH)
+        return false;
+    int gx, gy, gw, gh, gs;
+    int room = t.w - 20 - (icon_layout(0, 0, t.w, t.h, gx, gy, gw, gh, gs) ? 0 : 26);
+    return int(std::ceil(fo::text::width(t.name, fo::text::REGULAR, 13))) <= room;
+}
+
+void SpaceView::draw_tip(int tip, int px, int py, bool pointer) {
+    // Files' tooltip (paint_tip): next to the pointer on hover, under (or
+    // over) the block for keyboard focus, kept inside the view.
+    const fo::Theme &t = fo::theme();
+    const FolderModel &m = pane_->model();
+    const Block &k = blocks_[size_t(tip)];
+    const Entry &e = m.entries[size_t(k.index)];
+    std::vector<std::string> lines;
+    lines.push_back(display_name(e));
+    std::string detail = kind_word(e) + " \xC2\xB7 " + si_size(k.bytes);
+    if (e.is_dir)
+        if (const FolderSizes::Result *r = App::get().sizes().get(m.path(k.index)))
+            detail = fo::i18n::arg(fo::i18n::arg(fo::i18n::arg(fo::tr("%1 \xC2\xB7 %2 files, %3 folders"), detail),
+                                                 std::to_string(r->files)),
+                                   std::to_string(r->folders));
+    lines.push_back(detail);
+    if (total_ > 0) {
+        double share = 100.0 * double(k.bytes) / double(total_);
+        char buf[32];
+        if (share < 0.1)
+            std::snprintf(buf, sizeof buf, "<0.1 %%");
+        else
+            std::snprintf(buf, sizeof buf, "%.1f %%", share);
+        std::string l3 = fo::i18n::arg(fo::tr("%1 of this folder"), buf);
+        if (e.is_dir)
+            l3 += std::string(" \xC2\xB7 ") + fo::tr("Enter opens it");
+        lines.push_back(l3);
+    }
+    const int bx = x(), by = y(), bw = w(), bh = h();
+    const int max = std::clamp(bw - 16, 120, 420);
+    int width = 0;
+    for (const auto &l : lines)
+        width = std::max(width, int(std::ceil(fo::text::width(l, fo::text::REGULAR, 12))));
+    width = std::min(width + 24, max);
+    const int height = int(lines.size()) * 20 + 12;
+    const int tx0 = map_x_ + k.x, ty0 = map_y_ + k.y;
+    bool inside = pointer && px >= tx0 && px < tx0 + k.w && py >= ty0 && py < ty0 + k.h;
+    int ax, ay;
+    bool below;
+    if (inside) {
+        ax = px + 14, ay = py + 20;
+        below = ay + height <= by + bh;
+    } else {
+        ax = tx0 + k.w / 2 - width / 2, ay = ty0 + k.h + 6;
+        below = ay + height <= by + bh;
+    }
+    int ty = below ? ay : inside ? ay - 40 - height : ty0 - 6 - height;
+    int tx = std::clamp(ax, bx + 8, std::max(bx + 8, bx + bw - width - 8));
+    ty = std::clamp(ty, by + 8, std::max(by + 8, by + bh - height - 8));
+    const int r = 5 * corner();
+    fo::paint::round_fill(tx, ty, width, height, r, t.lighter_background());
+    fo::paint::round_fill(tx + 1, ty + 1, width - 2, height - 2, r, t.color("darker_background"));
+    for (size_t i = 0; i < lines.size(); ++i)
+        fo::text::draw(lines[i], tx + 12, ty + 6 + int(i) * 20, width - 24, 20, i == 0 ? t.foreground() : t.dim(),
+                       fo::text::REGULAR, 12, FL_ALIGN_LEFT, fo::text::Elide::Middle);
+}
+
 void SpaceView::draw() {
     const fo::Theme &t = fo::theme();
+    animating_ = false;
     fl_push_clip(x(), y(), w(), h());
     fo::paint::fill(x(), y(), w(), h(), t.background());
     const FolderModel &m = pane_->model();
@@ -466,8 +875,7 @@ void SpaceView::draw() {
     }
     if (!m.loading) {
         std::string tot = fo::i18n::arg(fo::tr("Apparent total %1"), (partial_ ? "\xE2\x89\xA5" : "") + si_size(total_));
-        if (pane_->show_hidden())
-            tot += std::string(" \xC2\xB7 ") + fo::tr("incl. hidden");
+        tot += std::string(" \xC2\xB7 ") + fo::tr("incl. hidden");
         int tx = x() + (busy ? 248 : 206);
         fo::text::draw(tot, tx, y() + 34, std::max(0, x() + w() - tx), 28, t.dim(), fo::text::REGULAR, 10);
     }
@@ -475,91 +883,140 @@ void SpaceView::draw() {
                    fo::text::REGULAR, 10);
     fo::text::draw(fo::tr("Subfolders not watched \xC2\xB7 not a snapshot"), x(), y() + 88, w() - 8, 18, t.dim(),
                    fo::text::REGULAR, 10);
-    for (size_t b = 0; b < blocks_.size(); ++b) {
-        const Block &k = blocks_[b];
-        if (k.w < 1 || k.h < 1)
-            continue;
-        const Entry &e = m.entries[size_t(k.index)];
-        int bx = map_x_ + k.x, by = map_y_ + k.y;
-        fo::Rgb c = block_color(e.name, e.is_dir);
-        if (int(b) == hover_)
-            c = fo::mix(c, t.bright_foreground(), 0.15);
-        fo::paint::fill(bx, by, k.w, k.h, c);
-        fo::paint::round_frame(bx, by, k.w, k.h, 0, 1, t.background());
-        if (int(b) == focus_) {
-            fo::paint::round_frame(bx + 1, by + 1, k.w - 2, k.h - 2, 0, 2, t.bright_foreground());
-            fo::paint::round_frame(bx + 3, by + 3, k.w - 6, k.h - 6, 0, 1, t.background());
-        }
-        if (pane_->files()->selected(k.index) && k.w > 6 && k.h > 6)
-            fo::paint::round_frame(bx + 2, by + 2, k.w - 4, k.h - 4, 0, 2, t.selection());
-        if (k.w >= kLabelW && k.h >= kLabelH) {
-            fl_push_clip(bx + 4, by + 2, k.w - 8, k.h - 4);
-            fo::icon::draw(e.is_dir ? "folder" : "image", bx + 8, by + 9, 11, t.background());
-            fo::text::draw(display_name(e), bx + 24, by + 4, k.w - 28, 20, t.background(), fo::text::REGULAR, 11);
-            fo::text::draw(si_size(k.bytes), bx + 8, by + 24, k.w - 12, 18, t.background(), fo::text::REGULAR, 11);
-            fl_pop_clip();
+
+    // The map. Its layout belongs to the folder shown once the listing is
+    // in and something has a size (or nothing is left to measure).
+    const std::string path = pane_->folder();
+    const bool ready = !m.loading && layout_path_ == path && (!blocks_.empty() || !busy);
+    const int rad = corner();
+    bool held = false;
+    if (m.loading && !shown_.empty() && shown_ != path && fo::anim::enabled()) {
+        // A listing usually lands within a frame or two: the old map holds
+        // still meanwhile, so the zoom starts from a settled frame.
+        const double now = fo::anim::now_ms();
+        if (hold_path_ != path)
+            hold_path_ = path, hold_since_ = now;
+        if (now - hold_since_ < kHoldMs) {
+            held = true;
+            animating_ = true;
+            if (const Snapshot *s = snapshot(shown_)) {
+                fl_push_clip(int(s->map.x), int(s->map.y), int(s->map.w), int(s->map.h));
+                for (const auto &k : s->tiles)
+                    draw_tile(int(s->map.x) + k.x, int(s->map.y) + k.y, k.w, k.h, k, false, false, false);
+                fl_pop_clip();
+            }
         }
     }
-    if (blocks_.empty() && !m.loading)
-        fo::text::draw(m.count() == 0 ? std::string(fo::tr("Empty folder")) + " \xC2\xB7 0 B"
-                                      : std::string(fo::tr("No complete positive sizes to show")),
-                       x(), map_y_, w(), 50, t.dim(), fo::text::REGULAR, 12, FL_ALIGN_CENTER);
-    // Files' "No area/label" list under the map.
-    if (!rows_.empty()) {
-        std::string lh = fo::i18n::arg(fo::tr("No area/label \xC2\xB7 %1 \xC2\xB7 wheel / \xE2\x86\x91\xE2\x86\x93"),
-                                       std::to_string(rows_.size()));
-        fo::text::draw(lh, x(), list_y_ + 8, w() - 70, 22, t.dim(), fo::text::REGULAR, 10);
-        int top = list_y_ + 32;
-        fl_push_clip(x(), top, w(), kRow * kListRows);
-        for (int r = row_top_; r < std::min(int(rows_.size()), row_top_ + kListRows); ++r) {
-            const Row &row = rows_[size_t(r)];
-            int ry = top + (r - row_top_) * kRow;
-            if (pane_->files()->selected(row.index))
-                fo::paint::round_fill(x(), ry, w() - 4, kRow - 2, r6 ? 4 : 0, t.selection());
-            if (r == row_focus_) {
-                fo::paint::fill(x() + 1, ry + 4, 2, kRow - 10, t.accent());
-                if (Fl::focus() == this)
-                    fo::paint::round_frame(x(), ry, w() - 4, kRow - 2, r6 ? 4 : 0, 1, t.accent());
+    if (held) {
+        // Nothing else of the map this frame.
+    } else if (!ready) {
+        // The sizes of a freshly opened folder come later: the zoom runs
+        // on the retained layouts and never waits for them.
+        fo::RectF full = rect_f(x(), y() + kToolbar, std::max(1, w()), std::max(24, h() - kToolbar - 26));
+        Plan plan;
+        bool moving = false;
+        if (this->plan(path, full, false, plan)) {
+            if (plan.moving) {
+                fl_push_clip(int(full.x), int(full.y), int(full.w), int(full.h));
+                paint_back(plan, false);
+                paint_front(plan);
+                fl_pop_clip();
+                moving = true;
+            } else if (plan.outline) {
+                int ox, oy, ow, oh;
+                round_rect(full, ox, oy, ow, oh);
+                fo::paint::round_frame(ox, oy, ow, oh, 6 * rad, 2, tile_fill(path_basename(path)));
             }
-            const Entry &e = m.entries[size_t(row.index)];
-            fo::text::draw(display_name(e) + " \xC2\xB7 " + row.state, x() + 6, ry, w() - 16, kRow - 2, t.foreground(),
-                           fo::text::REGULAR, 11, FL_ALIGN_LEFT, fo::text::Elide::Middle);
+        }
+        if (!moving)
+            fo::text::draw(fo::tr("Calculating sizes\xE2\x80\xA6"), x(), y() + kToolbar, w(), 50, t.dim(),
+                           fo::text::REGULAR, 12, FL_ALIGN_CENTER);
+        draw_ring(nullptr, 0);
+    } else {
+        remember(path);
+        fo::RectF map = rect_f(map_x_, map_y_, map_w_, map_h_);
+        Plan plan;
+        bool planned = this->plan(path, map, true, plan);
+        fl_push_clip(map_x_, map_y_, map_w_, map_h_);
+        if (planned)
+            paint_back(plan, true);
+        fo::RectF ring;
+        bool has_ring = false;
+        for (size_t b = 0; b < blocks_.size(); ++b) {
+            const Block &k = blocks_[b];
+            if (k.w < 1 || k.h < 1)
+                continue;
+            fo::RectF r = rect_f(map_x_ + k.x, map_y_ + k.y, k.w, k.h);
+            // Hits and keys use the final rectangle; only painting follows the zoom.
+            fo::RectF painted = planned ? plan.place(r) : r;
+            int px, py, pw, ph;
+            round_rect(painted, px, py, pw, ph);
+            bool focused = int(b) == focus_;
+            draw_tile(px, py, pw, ph, tile_of(k), pane_->files()->selected(k.index), int(b) == hover_, focused);
+            if (focused) {
+                ring = rect_f(px + 1, py + 1, std::max(0, pw - 2), std::max(0, ph - 2));
+                has_ring = true;
+            }
+        }
+        if (planned)
+            paint_front(plan);
+        if (has_ring && planned && plan.transforms()) {
+            // Mid-zoom the ring rides its block instead of gliding behind it.
+            int fx, fy, fw, fh;
+            round_rect(ring, fx, fy, fw, fh);
+            fo::paint::round_frame(fx, fy, fw, fh, 7 * rad, 2, t.accent());
+            draw_ring(nullptr, 0);
+        } else if (has_ring) {
+            draw_ring(&ring, 7 * rad);
         }
         fl_pop_clip();
-    }
-    fo::text::draw(fo::tr("Folders include hidden descendants"), x(), y() + h() - 22, w(), 22, t.dim(),
-                   fo::text::REGULAR, 10);
-    // The tooltip of the pointed block, or of a focused one too small for
-    // its own label (Files' Space tooltips).
-    int tip = hover_ >= 0 ? hover_ : -1;
-    if (tip < 0 && focus_ >= 0 && Fl::focus() == this) {
-        const Block &k = blocks_[size_t(focus_)];
-        if (!(k.w >= kLabelW && k.h >= kLabelH))
+        if (blocks_.empty())
+            fo::text::draw(m.count() == 0 ? std::string(fo::tr("Empty folder")) + " \xC2\xB7 0 B"
+                                          : std::string(fo::tr("No complete positive sizes to show")),
+                           x(), map_y_, w(), 50, t.dim(), fo::text::REGULAR, 12, FL_ALIGN_CENTER);
+        // Files' "No area/label" list under the map.
+        if (!rows_.empty()) {
+            std::string lh = fo::i18n::arg(fo::tr("No area/label \xC2\xB7 %1 \xC2\xB7 wheel / \xE2\x86\x91\xE2\x86\x93"),
+                                           std::to_string(rows_.size()));
+            fo::text::draw(lh, x(), list_y_ + 8, w() - 70, 22, t.dim(), fo::text::REGULAR, 10);
+            int top = list_y_ + 32;
+            fl_push_clip(x(), top, w(), kRow * kListRows);
+            for (int r = row_top_; r < std::min(int(rows_.size()), row_top_ + kListRows); ++r) {
+                const Row &row = rows_[size_t(r)];
+                int ry = top + (r - row_top_) * kRow;
+                if (pane_->files()->selected(row.index))
+                    fo::paint::fill(x(), ry, w() - 4, kRow - 2, t.selection());
+                if (r == row_focus_) {
+                    fo::paint::fill(x() + 1, ry + 4, 2, kRow - 10, t.accent());
+                    // A tiny block is a block and a row: one ring, on the block.
+                    if (!has_ring) {
+                        fo::RectF rr = rect_f(x(), ry, w() - 4, kRow - 2);
+                        draw_ring(&rr, 4 * rad);
+                    }
+                }
+                const Entry &e = m.entries[size_t(row.index)];
+                fo::text::draw(display_name(e) + " \xC2\xB7 " + row.state, x() + 6, ry, w() - 16, kRow - 2,
+                               t.foreground(), fo::text::REGULAR, 11, FL_ALIGN_LEFT, fo::text::Elide::Middle);
+            }
+            fl_pop_clip();
+        }
+        if (!has_ring && row_focus_ < 0)
+            draw_ring(nullptr, 0);
+        fo::text::draw(fo::tr("Folders include hidden descendants"), x(), y() + h() - 22, w(), 22, t.dim(),
+                       fo::text::REGULAR, 10);
+        // Pointing explains any block; keyboard focus only one too small
+        // for its own name and size, and never while a zoom moves the tiles.
+        bool zooming = planned && plan.transforms();
+        int tip = hover_;
+        if (tip < 0 && focus_ >= 0 && Fl::focus() == this && !zooming && !label_fits(tile_of(blocks_[size_t(focus_)])))
             tip = focus_;
-    }
-    if (tip >= 0) {
-        const Block &k = blocks_[size_t(tip)];
-        const Entry &e = m.entries[size_t(k.index)];
-        std::string l1 = display_name(e);
-        std::string l2 = kind_word(e) + " \xC2\xB7 " + si_size(k.bytes);
-        char share[32];
-        std::snprintf(share, sizeof share, "%.1f %%", total_ ? 100.0 * double(k.bytes) / double(total_) : 0.0);
-        std::string l3 = fo::i18n::arg(fo::tr("%1 of this folder"), share);
-        if (e.is_dir)
-            l3 += std::string(" \xC2\xB7 ") + fo::tr("Enter opens it");
-        int tw = int(std::max({fo::text::width(l1, fo::text::REGULAR, 11), fo::text::width(l2, fo::text::REGULAR, 11),
-                               fo::text::width(l3, fo::text::REGULAR, 11)})) + 24;
-        int th = 64;
-        int tx = std::min(x() + w() - tw - 4, map_x_ + k.x + k.w / 2);
-        int ty = std::min(y() + h() - th - 4, map_y_ + k.y + k.h / 2);
-        int r = t.radius() > 0 ? 5 : 0;
-        fo::paint::round_fill(tx, ty, tw, th, r, t.card());
-        fo::paint::round_fill(tx + 1, ty + 1, tw - 2, th - 2, r, t.background());
-        fo::text::draw(l1, tx + 12, ty + 4, tw - 24, 18, t.bright_foreground(), fo::text::REGULAR, 11);
-        fo::text::draw(l2, tx + 12, ty + 22, tw - 24, 18, t.foreground(), fo::text::REGULAR, 11);
-        fo::text::draw(l3, tx + 12, ty + 40, tw - 24, 18, t.foreground(), fo::text::REGULAR, 11);
+        if (tip >= 0 && tip < int(blocks_.size()))
+            draw_tip(tip, Fl::event_x(), Fl::event_y(), tip == hover_);
     }
     fl_pop_clip();
+    // Only a running motion asks for another frame; an idle map asks nothing.
+    if (animating_)
+        fo::anim::request_frame(this);
 }
 
 } // namespace flo::ui
