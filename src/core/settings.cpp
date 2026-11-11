@@ -139,6 +139,7 @@ void Settings::read_from(const Ini &ini) {
     parse_bool(ini.get("view", "details"), details_pane);
     parse_bool(ini.get("view", "rail-pinned"), rail_pinned);
     parse_bool(ini.get("view", "auto-sizes"), auto_sizes);
+    parse_bool(ini.get("view", "operation-bar"), operation_bar);
     parse_bool(ini.get("view", "thumbnails"), thumbnails);
     parse_int(ini.get("view", "thumbnail-size"), 64, 1024, thumbnail_size);
     parse_int(ini.get("window", "width"), 200, 20000, window_width);
@@ -153,6 +154,7 @@ void Settings::write_to(Ini &ini) const {
     ini.set("view", "details", details_pane ? "true" : "false");
     ini.set("view", "rail-pinned", rail_pinned ? "true" : "false");
     ini.set("view", "auto-sizes", auto_sizes ? "true" : "false");
+    ini.set("view", "operation-bar", operation_bar ? "true" : "false");
     ini.set("view", "thumbnails", thumbnails ? "true" : "false");
     ini.set("view", "thumbnail-size", std::to_string(thumbnail_size));
     ini.set("window", "width", std::to_string(window_width));

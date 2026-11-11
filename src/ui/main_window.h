@@ -133,6 +133,12 @@ private:
     fo::TabStrip *tab_strip_ = nullptr;
     fo::Sidebar *rail_ = nullptr;
     fo::StatusBar *status_ = nullptr;
+    class OperationBar *opbar_ = nullptr;
+    // Files' MC bar (Ctrl+Alt+B): shown from the setting; its height when shown.
+    void toggle_operation_bar();
+    std::string operation_reason(int i);
+    void run_operation(int i);
+    int opbar_height() const;
     DetailsPane *details_ = nullptr;
 
     std::vector<Pane *> tabs_;

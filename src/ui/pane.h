@@ -242,6 +242,12 @@ private:
     fo::SortHeader *list_header_ = nullptr;
     fo::IconButton *dismiss_ = nullptr;
     fo::Button *cancel_ = nullptr, *empty_trash_ = nullptr;
+    // Files' copy card: Pause / Resume, Cancel job, Clear pending.
+    fo::Button *pause_ = nullptr, *cancel_job_ = nullptr, *clear_pending_ = nullptr;
+    int card_y_ = 0, card_h_ = 0;
+    bool copy_card() const;
+    void draw_copy_card();
+    void relabel_card();
 
     std::string folder_;
     FolderModel model_;

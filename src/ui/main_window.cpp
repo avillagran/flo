@@ -8,6 +8,7 @@
 #include "ui/commands.h"
 #include "ui/details.h"
 #include "ui/favorites.h"
+#include "ui/operation_bar.h"
 #include "ui/file_view.h"
 #include "ui/pane.h"
 
@@ -129,6 +130,11 @@ MainWindow::MainWindow(int W, int H, const std::string &folder, const std::strin
     rail_->pinned(s.rail_pinned);
     details_ = new DetailsPane(W - kInspector, kTop, kInspector, H - kTop - kStatus);
     status_ = new fo::StatusBar(0, H - kStatus, W, kStatus);
+    opbar_ = new OperationBar(0, H - kStatus - OperationBar::kHeight, W, OperationBar::kHeight);
+    opbar_->reason([this](int i) { return operation_reason(i); });
+    opbar_->on_run([this](int i) { run_operation(i); });
+    if (!s.operation_bar)
+        opbar_->hide();
     end();
     resizable(nullptr);
     tabs_.push_back(make_pane(folder, int(view_from_settings(s.view))));
@@ -466,10 +472,18 @@ void MainWindow::layout() {
         return;
     const int W = w(), H = h();
     int rw = rail_->desired_width();
-    int body = std::max(40, H - kTop - kStatus);
+    const int ob = opbar_height();
+    int body = std::max(40, H - kTop - kStatus - ob);
     rail_->resize(0, kTop, rw, body);
     tab_strip_->resize(0, kHeader, W, kTabs);
     status_->resize(0, H - kStatus, W, kStatus);
+    if (ob) {
+        opbar_->resize(0, H - kStatus - ob, W, ob);
+        opbar_->space(active_pane()->view() == Pane::View::Space && !split());
+        opbar_->show();
+    } else {
+        opbar_->hide();
+    }
     bool insp = details_on_ && !dual_ && W >= 800;
     int iw = insp ? kInspector : 0;
     details_->resize(W - kInspector, kTop, kInspector, body);
@@ -532,11 +546,72 @@ void MainWindow::draw() {
     // Between the two panes of the dual view: a card-colored line.
     if (dual_ && !top_layer()) {
         const fo::Theme &t = fo::theme();
-        fo::paint::vline(dual_->x() - 1, kTop, h() - kTop - kStatus, t.card());
+        fo::paint::vline(dual_->x() - 1, kTop, h() - kTop - kStatus - opbar_height(), t.card());
     }
 }
 
 int MainWindow::handle(int event) { return fo::Window::handle(event); }
+
+// --- Files' MC operation bar ------------------------------------------------------------
+
+int MainWindow::opbar_height() const { return App::get().settings().operation_bar ? OperationBar::kHeight : 0; }
+
+void MainWindow::toggle_operation_bar() {
+    if (modal_open())
+        return;
+    Settings &s = App::get().settings();
+    s.operation_bar = !s.operation_bar;
+    App::get().save_settings();
+    layout();
+}
+
+// Files' operation_bar::reason, for what Flo has.
+std::string MainWindow::operation_reason(int i) {
+    if (modal_open())
+        return fo::tr("Close the dialog or tool first");
+    if (field_mode_ != Field::None)
+        return fo::tr("Enter: back to the list");
+    if (i == 0 || i == 7)
+        return {};
+    Pane *p = active_pane();
+    if (p->loading())
+        return fo::tr("Wait for the load");
+    if (i == 3 && p->view() == Pane::View::Space && !split())
+        return {};
+    if (i == 2) {
+        if (!p->current_entry())
+            return fo::tr("Focus an item first");
+    } else if (i != 5 && p->selected_paths().empty()) {
+        return fo::tr("Select at least one item");
+    }
+    return {};
+}
+
+void MainWindow::run_operation(int i) {
+    std::string why = operation_reason(i);
+    if (!why.empty()) {
+        if (!modal_open())
+            fo::Toast::show(this, "MC: " + why, 2.5);
+        return;
+    }
+    Pane *p = active_pane();
+    switch (i) {
+    case 0: show_help(); break;
+    case 1: p->rename(); break;
+    case 2: p->preview(); break;
+    case 3:
+        if (p->view() == Pane::View::Space && !split())
+            p->measure_listed();
+        else
+            p->transfer(false);
+        break;
+    case 4: p->transfer(true); break;
+    case 5: p->new_folder(); break;
+    case 6: p->delete_selected(); break;
+    case 7: actions_menu(); break;
+    }
+    opbar_->redraw();
+}
 
 void MainWindow::hide() {
     if (session_owner_ && !tabs_.empty())
@@ -655,6 +730,10 @@ void MainWindow::update_status() {
     static int tip = 0;
     status_->hint(fo::tr(kTips[size_t(tip) % (sizeof kTips / sizeof kTips[0])]));
     status_->right(fs_summary(is_virtual_folder(p->folder()) ? xdg::home() : p->folder()));
+    if (opbar_ && opbar_->visible()) {
+        opbar_->space(p->view() == Pane::View::Space && !split());
+        opbar_->redraw(); // the buttons follow the selection
+    }
 }
 
 void MainWindow::pss_tick(void *data) {
@@ -887,6 +966,9 @@ std::vector<fo::MenuItem> MainWindow::preferences_items() {
         MenuItem(fo::tr("Show thumbnails of pictures and videos"), "", toggle(&Settings::thumbnails))
             .check(s.thumbnails),
         MenuItem(fo::tr("Calculate sizes automatically"), "", toggle(&Settings::auto_sizes)).check(s.auto_sizes),
+        MenuItem(fo::tr("MC operation bar"), "Ctrl+Alt+B", [this] { toggle_operation_bar(); })
+            .with_icon("keyboard")
+            .check(s.operation_bar),
         MenuItem(fo::tr("Keep the sidebar open"), "", [this] {
             rail_->pinned(!rail_->pinned());
             App::get().settings().rail_pinned = rail_->pinned();
@@ -1142,6 +1224,7 @@ void MainWindow::show_help() {
                   {"Ctrl+E / Ctrl+Alt+E", fo::tr("Star / open Starred")},
                   {"Ctrl+Alt+I", fo::tr("Inspector")},
                   {"Alt+Enter", fo::tr("Properties and permissions")},
+                  {"Ctrl+Alt+B", fo::tr("MC operation bar")},
                   {"F10 / Ctrl+,", fo::tr("Actions / Preferences")},
                   {"Ctrl+R", fo::tr("Reload")},
                   {"Menu / Shift+F10", fo::tr("Context menu")},
@@ -1179,6 +1262,7 @@ void MainWindow::build_shortcuts() {
     on("Ctrl+E", [P] { P()->toggle_star(); });
     on("Ctrl+Alt+E", [P] { P()->navigate(kStarred); });
     on("F9", [this] { toggle_dual(); });
+    on("Ctrl+Alt+B", [this] { toggle_operation_bar(); });
     on("Ctrl+Shift+F", [this] { begin_search(); });
     on("Ctrl+F", [this] { begin_filter(); });
     on("Ctrl+Space", [P] { P()->measure_focused(); });

@@ -92,10 +92,20 @@ struct OpState {
     CancelToken cancel;
     std::mutex m;
     std::condition_variable cv;
+    // Files' Pause: the worker waits at its next check (between files and
+    // between chunks of a big file) until resumed or cancelled.
+    std::atomic<bool> paused{false};
+    std::mutex pm;
+    std::condition_variable pcv;
     bool answered = false;
     ConflictChoice choice = ConflictChoice::KeepBoth;
     bool apply_all = false;
 };
+
+void wake(OpState &s) {
+    { std::lock_guard<std::mutex> lock(s.pm); }
+    s.pcv.notify_all();
+}
 
 std::string quoted(const std::string &path) { return "“" + path_basename(path) + "”"; }
 
@@ -115,6 +125,7 @@ struct FileOps::Impl {
     std::map<uint64_t, std::shared_ptr<OpState>> ops;
     uint64_t next_id = 1;
     std::atomic<int> active{0};
+    std::atomic<uint64_t> running{0}; // the operation the worker is on
     UndoHistory history; // only touched on the worker thread
     std::weak_ptr<Impl> self;
 
@@ -141,7 +152,14 @@ struct Ctx {
     OpProgress progress;
     std::chrono::steady_clock::time_point last_progress{};
 
-    bool cancelled() const { return state->cancel.cancelled(); }
+    // Waits here while the operation is paused; true once it is cancelled.
+    bool cancelled() const {
+        if (state->paused.load()) {
+            std::unique_lock<std::mutex> lock(state->pm);
+            state->pcv.wait(lock, [this] { return !state->paused.load() || state->cancel.cancelled(); });
+        }
+        return state->cancel.cancelled();
+    }
 
     void report_progress(bool force = false) {
         const auto now = std::chrono::steady_clock::now();
@@ -188,9 +206,9 @@ Resolve resolve_name(Ctx &ctx, const std::string &source, const std::string &fol
             }
             ctx.impl->poster.post([f, c] { f(c); });
             std::unique_lock<std::mutex> lock(ctx.state->m);
-            while (!ctx.state->answered && !ctx.cancelled())
+            while (!ctx.state->answered && !ctx.state->cancel.cancelled())
                 ctx.state->cv.wait_for(lock, std::chrono::milliseconds(200));
-            if (ctx.cancelled() || ctx.state->choice == ConflictChoice::Cancel) {
+            if (ctx.state->cancel.cancelled() || ctx.state->choice == ConflictChoice::Cancel) {
                 ctx.state->cancel.cancel();
                 return Resolve::Cancel;
             }
@@ -735,6 +753,7 @@ void FileOps::cancel(uint64_t op) {
         return;
     it->second->cancel.cancel();
     it->second->cv.notify_all();
+    wake(*it->second);
 }
 
 void FileOps::cancel_all() {
@@ -742,7 +761,46 @@ void FileOps::cancel_all() {
     for (auto &kv : impl_->ops) {
         kv.second->cancel.cancel();
         kv.second->cv.notify_all();
+        wake(*kv.second);
     }
+}
+
+bool FileOps::pause(uint64_t op, bool on) {
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    auto it = impl_->ops.find(op);
+    if (it == impl_->ops.end() || impl_->running.load() != op || it->second->cancel.cancelled())
+        return false;
+    {
+        std::lock_guard<std::mutex> plock(it->second->pm);
+        it->second->paused = on;
+    }
+    it->second->pcv.notify_all();
+    return true;
+}
+
+bool FileOps::paused(uint64_t op) const {
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    auto it = impl_->ops.find(op);
+    return it != impl_->ops.end() && it->second->paused.load();
+}
+
+std::size_t FileOps::pending() const {
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    std::size_t n = 0;
+    for (const auto &kv : impl_->ops)
+        n += kv.first != impl_->running.load() && !kv.second->cancel.cancelled();
+    return n;
+}
+
+std::size_t FileOps::clear_pending() {
+    std::lock_guard<std::mutex> lock(impl_->mutex);
+    std::size_t n = 0;
+    for (auto &kv : impl_->ops)
+        if (kv.first != impl_->running.load() && !kv.second->cancel.cancelled()) {
+            kv.second->cancel.cancel();
+            ++n;
+        }
+    return n;
 }
 
 void FileOps::resolve_conflict(uint64_t op, ConflictChoice choice, bool apply_to_all) {
@@ -777,6 +835,7 @@ static uint64_t enqueue(const std::shared_ptr<FileOps::Impl> &impl, OpKind kind,
         auto self = weak.lock();
         if (!self)
             return;
+        self->running = id;
         Ctx ctx{self.get(), id, kind, state, policy, {}, {}, {}, {}};
         ctx.result.op = id;
         ctx.result.kind = kind;
@@ -784,7 +843,8 @@ static uint64_t enqueue(const std::shared_ptr<FileOps::Impl> &impl, OpKind kind,
         ctx.progress.kind = kind;
         if (!ctx.cancelled())
             work(ctx);
-        ctx.result.cancelled = ctx.result.cancelled || ctx.cancelled();
+        self->running = 0;
+        ctx.result.cancelled = ctx.result.cancelled || ctx.state->cancel.cancelled();
         ctx.result.ok = ctx.result.errors.empty() && !ctx.result.cancelled;
         if (!ctx.entry.empty()) {
             ctx.entry.fence_ns = take_fence();

@@ -42,6 +42,7 @@ struct Settings {
     bool rail_pinned = false;  // the rail stays expanded
     bool auto_sizes = true;    // measure visible folders (Files' default)
     bool thumbnails = true;    // pictures and videos show their thumbnails
+    bool operation_bar = false; // Files' MC-style F-key bar (Ctrl+Alt+B)
     int window_width = 1100, window_height = 700; // Files' first size
     bool window_maximized = false;
     int thumbnail_size = 256; // requested pixels (Folio: large)

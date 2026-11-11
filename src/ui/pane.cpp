@@ -69,6 +69,12 @@ Pane::Pane(MainWindow *win, int x, int y, int w, int h, const std::string &folde
     cancel_->hide();
     empty_trash_ = new fo::Button(0, 0, 140, 32, nullptr);
     empty_trash_->hide();
+    pause_ = new fo::Button(0, 0, 80, 27, nullptr);
+    pause_->hide();
+    cancel_job_ = new fo::Button(0, 0, 120, 27, nullptr);
+    cancel_job_->hide();
+    clear_pending_ = new fo::Button(0, 0, 138, 27, nullptr);
+    clear_pending_->hide();
     list_header_ = new fo::SortHeader(x, y, w, kListHeader);
     grid_ = new FileView(x, y, w, h, &model_);
     columns_ = new ColumnsView(x, y, w, h, this);
@@ -86,6 +92,24 @@ Pane::Pane(MainWindow *win, int x, int y, int w, int h, const std::string &folde
             ops_->cancel(progress_.op);
     });
     empty_trash_->on_click([this] { empty_trash(); });
+    pause_->on_click([this] {
+        if (!ops_ || !progress_on_)
+            return;
+        ops_->pause(progress_.op, !ops_->paused(progress_.op));
+        relabel_card();
+        redraw();
+    });
+    cancel_job_->on_click([this] {
+        if (ops_ && progress_on_)
+            ops_->cancel(progress_.op);
+    });
+    clear_pending_->on_click([this] {
+        if (!ops_)
+            return;
+        size_t n = ops_->clear_pending();
+        fo::Toast::show(win_, fo::trn("%n pending operations cleared", int(n)), 2.5);
+        redraw();
+    });
 
     lister_ = std::make_unique<Lister>(app.queue());
     searcher_ = std::make_unique<Searcher>(app.queue());
@@ -108,6 +132,7 @@ void Pane::relabel() {
     dismiss_->tooltip_text(fo::tr("Dismiss"));
     cancel_->copy_label(fo::tr("Cancel"));
     empty_trash_->copy_label(fo::tr("Empty Trash"));
+    relabel_card();
     if (!folder_.empty()) {
         build_crumbs(); // Recents, Trash, Home
         win_->pane_view_changed(this);
@@ -1647,12 +1672,74 @@ std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const st
 // --- File operations ---------------------------------------------------------
 
 void Pane::op_progress(const OpProgress &p) {
+    const bool card = copy_card();
     progress_ = p;
-    if (!progress_on_) {
+    if (!progress_on_ || card != copy_card()) {
         progress_on_ = true;
+        relabel_card();
         place_children();
     }
     redraw();
+}
+
+bool Pane::copy_card() const {
+    if (!progress_on_)
+        return false;
+    switch (progress_.kind) {
+    case OpKind::Copy:
+    case OpKind::Move:
+    case OpKind::Duplicate:
+    case OpKind::Compress:
+    case OpKind::Extract: return true;
+    default: return false;
+    }
+}
+
+void Pane::relabel_card() {
+    const bool paused = ops_ && progress_on_ && ops_->paused(progress_.op);
+    pause_->copy_label(paused ? fo::tr("Resume") : fo::tr("Pause"));
+    cancel_job_->copy_label(card_h_ > 0 && w() < 420 ? fo::tr("Cancel") : fo::tr("Cancel job"));
+    clear_pending_->copy_label(fo::tr("Clear pending"));
+}
+
+// Files' copy card (copy_ui.rs): what is copied, bytes and entries so far,
+// the operations waiting, the current item, Pause / Resume, Cancel job and
+// Clear pending.
+void Pane::draw_copy_card() {
+    const fo::Theme &t = fo::theme();
+    const int mx = dual_ ? 8 : 16, cx = x() + mx, cw = std::max(10, w() - 2 * mx);
+    const bool narrow = cw < 340;
+    const bool paused = ops_ && ops_->paused(progress_.op);
+    const size_t pending = ops_ ? ops_->pending() : 0;
+    fo::paint::round_fill(cx, card_y_, cw, card_h_, t.radius() > 0 ? 8 : 0, t.dark_background());
+    std::string label;
+    switch (progress_.kind) {
+    case OpKind::Move: label = fo::tr("Moving"); break;
+    case OpKind::Compress: label = fo::tr("Compressing"); break;
+    case OpKind::Extract: label = fo::tr("Extracting"); break;
+    case OpKind::Duplicate: label = fo::tr("Duplicating"); break;
+    default: label = fo::tr("Copying"); break;
+    }
+    if (paused)
+        label = fo::tr("Paused");
+    const std::string bytes = si_size(progress_.bytes_done);
+    const std::string entries = fo::trn("%n entries", int(progress_.items_done));
+    std::string line = narrow ? label + " \xC2\xB7 " + fo::trn("%n queued", int(pending))
+                              : label + " \xC2\xB7 " + bytes + " \xC2\xB7 " + entries + " \xC2\xB7 " +
+                                    fo::trn("%n pending", int(pending));
+    if (!narrow && progress_.bytes_total > 0) {
+        const int pw = 120, px = cx + cw - 12 - pw, py = card_y_ + 15;
+        double f = std::min(1.0, double(progress_.bytes_done) / double(progress_.bytes_total));
+        fo::paint::fill(px, py, pw, 4, t.selection());
+        fo::paint::fill(px, py, int(pw * f), 4, paused ? t.dim() : t.accent());
+    }
+    fo::text::draw(line, cx + 12, card_y_ + 4, cw - 24 - (narrow ? 0 : 132), narrow ? 22 : 26, t.bright_foreground(),
+                   fo::text::REGULAR, 11);
+    if (narrow)
+        fo::text::draw(bytes + " \xC2\xB7 " + entries, cx + 12, card_y_ + 26, cw - 24, 20, t.dim(), fo::text::REGULAR, 10);
+    if (!progress_.current.empty())
+        fo::text::draw(progress_.current, cx + 12, card_y_ + (narrow ? 46 : 30), cw - 24, 20, t.dim(),
+                       fo::text::REGULAR, 10, FL_ALIGN_LEFT, fo::text::Elide::Middle);
 }
 
 void Pane::op_conflict(const OpConflict &c) {
@@ -1679,7 +1766,10 @@ void Pane::op_conflict(const OpConflict &c) {
 
 void Pane::op_done(const OpResult &r) {
     bool was = progress_on_;
-    progress_on_ = false;
+    if (ops_ && ops_->busy() && r.op != progress_.op)
+        was = false; // a cleared pending operation: the running one goes on
+    else
+        progress_on_ = false;
     if (was)
         place_children();
     if (r.kind == OpKind::Undo || r.kind == OpKind::Redo) {
@@ -1736,7 +1826,7 @@ std::string Pane::banner_text(bool &error, bool &progress) const {
         error = true;
         return fo::tr(model_.error.c_str()); // the core's sentences are in the catalogs
     }
-    if (progress_on_) {
+    if (progress_on_ && !copy_card()) {
         progress = true;
         std::string verb;
         switch (progress_.kind) {
@@ -1845,6 +1935,25 @@ void Pane::place_children() {
     if (grid_header())
         ty += kGridHeader;
     int vh = std::max(10, y() + h() - 8 - ty - (dual_ ? kDualFooter : 0));
+    card_h_ = 0;
+    if (copy_card() && message_.empty() && model_.error.empty()) {
+        // Files: the card sits at the bottom of the list, 88 px (138 narrow).
+        const bool narrow = cw < 340;
+        card_h_ = narrow ? 138 : 88;
+        vh = std::max(10, vh - card_h_ - 12);
+        card_y_ = ty + vh + 12;
+        const int by = card_y_ + (narrow ? 70 : 54), clear_y = card_y_ + (narrow ? 104 : 54);
+        pause_->resize(cx + 12, by, 80, 27);
+        cancel_job_->resize(cx + 100, by, narrow ? std::max(60, cw - 112) : 120, 27);
+        clear_pending_->resize(narrow ? cx + 12 : cx + cw - 150, clear_y, narrow ? cw - 24 : 138, 27);
+        pause_->show();
+        cancel_job_->show();
+        clear_pending_->show();
+    } else {
+        pause_->hide();
+        cancel_job_->hide();
+        clear_pending_->hide();
+    }
     bool cols = view_ == View::Columns && !dual_, space = view_ == View::Space && !dual_;
     cols ? columns_->show() : columns_->hide();
     space ? space_->show() : space_->hide();
@@ -1932,6 +2041,8 @@ void Pane::draw() {
         fo::text::draw("+", px, zy, 36, 28, grid_zoom_ < kZoomMax - 1e-6 ? t.accent() : t.dim(), fo::text::REGULAR,
                        13, FL_ALIGN_CENTER, fo::text::Elide::None);
     }
+    if (card_h_ > 0)
+        draw_copy_card();
     draw_children();
     if (dual_) {
         // Files' dual footer: visible and loaded counts, the marks, Tab.

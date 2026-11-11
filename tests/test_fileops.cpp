@@ -376,3 +376,50 @@ TEST(outermost_paths_drop_nested) {
     CHECK(o.size() == 1 && o[0] == d + "/a");
     CHECK(valid_file_name("ok.txt") && !valid_file_name("a/b") && !valid_file_name("..") && !valid_file_name(""));
 }
+
+TEST(file_ops_pause_resume_and_clear_pending) {
+    const std::string d = private_dir("pause");
+    const std::string src = d + "/src", dst = d + "/dst";
+    CHECK(::mkdir(src.c_str(), 0700) == 0 && ::mkdir(dst.c_str(), 0700) == 0);
+    write_file(src + "/a", "first");
+    write_file(src + "/b", "second");
+    write_file(src + "/c", "third");
+    write_file(dst + "/a", "already here");
+    assert_inside(d);
+    Ops o;
+    // "a" is taken: the worker waits for the answer, so A is the running op.
+    uint64_t a = o.ops.copy({src + "/a", src + "/b"}, dst, ConflictPolicy::Ask);
+    const auto end = std::chrono::steady_clock::now() + std::chrono::seconds(5);
+    while (o.conflicts.empty() && std::chrono::steady_clock::now() < end) {
+        o.q.wait(50);
+        o.q.dispatch();
+    }
+    CHECK_EQ(o.conflicts.size(), size_t(1));
+    CHECK(o.ops.pause(a));
+    CHECK(o.ops.paused(a));
+    uint64_t b = o.ops.copy({src + "/c"}, dst);
+    uint64_t c = o.ops.move({src + "/c"}, dst);
+    CHECK(!o.ops.pause(b)); // only the running operation pauses
+    CHECK_EQ(o.ops.pending(), size_t(2));
+    CHECK_EQ(o.ops.clear_pending(), size_t(2));
+    CHECK_EQ(o.ops.pending(), size_t(0));
+    o.ops.resolve_conflict(a, ConflictChoice::KeepBoth, false);
+    // Paused at the next check: "b" does not arrive while paused.
+    const auto hold = std::chrono::steady_clock::now() + std::chrono::milliseconds(400);
+    while (std::chrono::steady_clock::now() < hold) {
+        o.q.wait(50);
+        o.q.dispatch();
+    }
+    CHECK(o.done.empty());
+    CHECK(!exists(dst + "/b"));
+    CHECK(o.ops.resume(a));
+    OpResult ra = o.wait(a);
+    CHECK(ra.ok);
+    CHECK_EQ(read_file(dst + "/b"), std::string("second"));
+    CHECK_EQ(read_file(dst + "/a"), std::string("already here"));
+    OpResult rb = o.wait(b), rc = o.wait(c);
+    CHECK(rb.cancelled && rc.cancelled);
+    CHECK(!exists(dst + "/c"));
+    CHECK_EQ(read_file(src + "/c"), std::string("third"));
+    CHECK(!o.ops.pause(a)); // finished
+}

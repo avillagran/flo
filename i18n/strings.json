@@ -104,6 +104,18 @@
   "plural": true
  },
  {
+  "source": "%n pending",
+  "plural": true
+ },
+ {
+  "source": "%n pending operations cleared",
+  "plural": true
+ },
+ {
+  "source": "%n queued",
+  "plural": true
+ },
+ {
   "source": "%n thumbnails",
   "plural": true
  },
@@ -141,6 +153,10 @@
  },
  {
   "source": "Actions / Preferences",
+  "plural": false
+ },
+ {
+  "source": "Actions on files",
   "plural": false
  },
  {
@@ -224,6 +240,10 @@
   "plural": false
  },
  {
+  "source": "Cancel job",
+  "plural": false
+ },
+ {
   "source": "Cancel the Space calculation",
   "plural": false
  },
@@ -237,6 +257,10 @@
  },
  {
   "source": "Clear filter",
+  "plural": false
+ },
+ {
+  "source": "Clear pending",
   "plural": false
  },
  {
@@ -261,6 +285,10 @@
  },
  {
   "source": "Close tab",
+  "plural": false
+ },
+ {
+  "source": "Close the dialog or tool first",
   "plural": false
  },
  {
@@ -336,6 +364,10 @@
   "plural": false
  },
  {
+  "source": "Copy the selection: review the destination",
+  "plural": false
+ },
+ {
   "source": "Copy to…",
   "plural": false
  },
@@ -361,6 +393,10 @@
  },
  {
   "source": "Create",
+  "plural": false
+ },
+ {
+  "source": "Create a folder",
   "plural": false
  },
  {
@@ -552,6 +588,10 @@
   "plural": false
  },
  {
+  "source": "Enter: back to the list",
+  "plural": false
+ },
+ {
   "source": "Executable",
   "plural": false
  },
@@ -612,6 +652,10 @@
   "plural": false
  },
  {
+  "source": "Focus an item first",
+  "plural": false
+ },
+ {
   "source": "Folder",
   "plural": false
  },
@@ -665,6 +709,14 @@
  },
  {
   "source": "Groups, List, Columns, Space, Grid",
+  "plural": false
+ },
+ {
+  "source": "Help",
+  "plural": false
+ },
+ {
+  "source": "Help and shortcuts",
   "plural": false
  },
  {
@@ -784,6 +836,10 @@
   "plural": false
  },
  {
+  "source": "MC operation bar",
+  "plural": false
+ },
+ {
   "source": "MIME type: %1 · Open with: %2",
   "plural": false
  },
@@ -801,6 +857,10 @@
  },
  {
   "source": "Move %1 to:",
+  "plural": false
+ },
+ {
+  "source": "Move the selection: review the destination",
   "plural": false
  },
  {
@@ -1024,6 +1084,14 @@
   "plural": false
  },
  {
+  "source": "Pause",
+  "plural": false
+ },
+ {
+  "source": "Paused",
+  "plural": false
+ },
+ {
   "source": "Permissions %1 → %2 · every link to the inode",
   "plural": false
  },
@@ -1077,6 +1145,10 @@
  },
  {
   "source": "Preview",
+  "plural": false
+ },
+ {
+  "source": "Preview the focused item",
   "plural": false
  },
  {
@@ -1180,6 +1252,10 @@
   "plural": false
  },
  {
+  "source": "Rename the selection",
+  "plural": false
+ },
+ {
   "source": "Reopen closed tab",
   "plural": false
  },
@@ -1213,6 +1289,10 @@
  },
  {
   "source": "Restoring",
+  "plural": false
+ },
+ {
+  "source": "Resume",
   "plural": false
  },
  {
@@ -1276,6 +1356,10 @@
   "plural": false
  },
  {
+  "source": "Select at least one item",
+  "plural": false
+ },
+ {
   "source": "Selection",
   "plural": false
  },
@@ -1290,6 +1374,10 @@
  {
   "source": "Send %n items to Trash",
   "plural": true
+ },
+ {
+  "source": "Send the selection to the trash",
+  "plural": false
  },
  {
   "source": "Send to Trash",
@@ -1649,6 +1737,10 @@
  },
  {
   "source": "Volume: unavailable",
+  "plural": false
+ },
+ {
+  "source": "Wait for the load",
   "plural": false
  },
  {

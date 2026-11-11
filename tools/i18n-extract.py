@@ -35,6 +35,11 @@ DYNAMIC = [
     "Owner", "Group", "Others", "Only local paths have properties.",
     "Only your own files and folders without special bits can change here.",
     "The object changed since it was read; reload before applying.",
+    # Files' MC operation bar (ui/operation_bar.cpp), its texts and tooltips.
+    "Help", "Rename", "Preview", "Copy", "Move", "Folder", "Trash", "Actions", "Recalculate",
+    "Help and shortcuts", "Rename the selection", "Preview the focused item",
+    "Copy the selection: review the destination", "Move the selection: review the destination",
+    "Create a folder", "Send the selection to the trash", "Actions on files",
 ]
 
 call = re.compile(r'\b(?:fo::)?(trn?)\(\s*((?:"(?:[^"\\]|\\.)*"\s*)+)')

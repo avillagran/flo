@@ -111,6 +111,17 @@ public:
     // big files; what was finished stays, recorded for undo).
     void cancel(uint64_t op);
     void cancel_all();
+    // Files' Pause / Resume of the running operation: it stops at its next
+    // check (between files, between 4 MiB chunks of a big file) and waits
+    // there until resumed or cancelled. Returns false when `op` is not the
+    // running one (queued operations wait anyway).
+    bool pause(uint64_t op, bool on = true);
+    bool resume(uint64_t op) { return pause(op, false); }
+    bool paused(uint64_t op) const;
+    // Operations queued behind the running one, and Files' "Clear pending":
+    // cancels them before they start (nothing of theirs has happened yet).
+    std::size_t pending() const;
+    std::size_t clear_pending();
     // Answers an on_conflict question; apply_to_all covers the rest of the op.
     void resolve_conflict(uint64_t op, ConflictChoice choice, bool apply_to_all);
 
