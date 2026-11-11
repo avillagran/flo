@@ -855,18 +855,27 @@ void Pane::open_uri(const std::string &uri) {
         busy_.clear();
 }
 
-// GVfs's questions come in paragraphs; the dialog wraps one paragraph
-// (fo::text::wrap doesn't break at newlines yet), so they are joined.
-static std::string one_paragraph(const std::string &text) {
+// GVfs's questions come in paragraphs. The dialog wraps each one; this only
+// tidies spacing: tabs become spaces, runs of spaces and of blank lines
+// shrink to one, and the ends are trimmed.
+static std::string tidy_paragraphs(const std::string &text) {
     std::string out;
     for (char c : text) {
-        if (c == '\n' || c == '\r' || c == '\t')
-            c = ' ';
-        if (c == ' ' && (out.empty() || out.back() == ' '))
+        if (c == '\r')
             continue;
+        if (c == '\t')
+            c = ' ';
+        if (c == ' ' && (out.empty() || out.back() == ' ' || out.back() == '\n'))
+            continue;
+        if (c == '\n') {
+            while (!out.empty() && out.back() == ' ')
+                out.pop_back();
+            if (out.empty() || (out.size() >= 2 && out[out.size() - 1] == '\n' && out[out.size() - 2] == '\n'))
+                continue;
+        }
         out += c;
     }
-    while (!out.empty() && out.back() == ' ')
+    while (!out.empty() && (out.back() == ' ' || out.back() == '\n'))
         out.pop_back();
     return out;
 }
@@ -874,7 +883,7 @@ static std::string one_paragraph(const std::string &text) {
 void Pane::ask_mount(const MountRequest &r) {
     fo::DialogSpec s;
     s.scrim_cancels = false;
-    s.message = one_paragraph(r.message);
+    s.message = tidy_paragraphs(r.message);
     uint64_t id = r.id;
     if (r.kind == MountRequest::Password) {
         s.title = fo::tr("Sign in");
