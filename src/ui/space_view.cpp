@@ -10,6 +10,7 @@
 
 #include "fltk-omarchy/i18n.h"
 #include "fltk-omarchy/icons.h"
+#include "fltk-omarchy/menu.h"
 #include "fltk-omarchy/paint.h"
 #include "fltk-omarchy/text.h"
 
@@ -22,7 +23,6 @@
 namespace flo::ui {
 
 namespace {
-const int kHeader = 30, kFooter = 24;
 
 fo::Rgb block_color(const std::string &name, bool dir) {
     const fo::Theme &t = fo::theme();
@@ -123,33 +123,157 @@ void SpaceView::resize(int X, int Y, int W, int H) {
 void SpaceView::layout() {
     const FolderModel &m = pane_->model();
     std::vector<std::pair<int, uint64_t>> sizes;
+    std::vector<Row> zero;
     total_ = 0;
-    unsized_ = 0;
+    partial_ = false;
     for (int i = 0; i < m.count(); ++i) {
         const Entry &e = m.entries[size_t(i)];
         uint64_t b = 0;
+        bool known = true;
         if (e.is_dir) {
-            if (const FolderSizes::Result *r = App::get().sizes().get(m.path(i)))
+            const FolderSizes::Result *r = App::get().sizes().get(m.path(i));
+            if (r)
                 b = r->bytes;
+            known = r != nullptr;
+            if (!r || !r->complete)
+                partial_ = true;
         } else {
             b = uint64_t(std::max<int64_t>(0, e.size));
         }
         if (b == 0) {
-            ++unsized_;
+            zero.push_back({i, known ? "0 B \xC2\xB7 " + std::string(fo::tr("no area")) : std::string(fo::tr("Unknown size"))});
             continue;
         }
         total_ += b;
         sizes.push_back({i, b});
     }
     std::stable_sort(sizes.begin(), sizes.end(), [](const auto &a, const auto &b) { return a.second > b.second; });
-    map_x_ = x(), map_y_ = y() + kHeader, map_w_ = w() - 4, map_h_ = std::max(0, h() - kHeader - kFooter);
-    blocks_ = squarify(sizes, map_w_, map_h_);
+    // First pass with the list as big as it may get, to know which blocks
+    // are too small for a label (they get a row too, as in Files).
+    auto place = [&](size_t rows) {
+        int reserve = rows == 0 ? 26 : 56 + kRow * int(std::min<size_t>(rows, kListRows));
+        map_x_ = x(), map_y_ = y() + kToolbar, map_w_ = std::max(0, w() - 4);
+        map_h_ = std::max(0, h() - kToolbar - reserve);
+        blocks_ = squarify(sizes, map_w_, map_h_);
+    };
+    auto small_rows = [&] {
+        std::vector<Row> out;
+        for (const auto &b : blocks_)
+            if (b.w < kLabelW || b.h < kLabelH)
+                out.push_back({b.index, si_size(b.bytes) + " \xC2\xB7 " + fo::tr("label in list")});
+        return out;
+    };
+    place(zero.size() + sizes.size());
+    std::vector<Row> small = small_rows();
+    place(zero.size() + small.size());
+    small = small_rows();
+    rows_ = std::move(small);
+    rows_.insert(rows_.end(), zero.begin(), zero.end());
+    list_y_ = map_y_ + map_h_;
+    row_top_ = std::clamp(row_top_, 0, std::max(0, int(rows_.size()) - kListRows));
     int cur = pane_->current();
     focus_ = -1;
     for (size_t b = 0; b < blocks_.size(); ++b)
         if (blocks_[b].index == cur)
             focus_ = int(b);
+    if (row_focus_ >= int(rows_.size()))
+        row_focus_ = -1;
+    if (row_focus_ >= 0 && rows_[size_t(row_focus_)].index != cur)
+        row_focus_ = -1;
     hover_ = -1;
+    layout_buttons();
+}
+
+bool SpaceView::scanning() const {
+    const FolderModel &m = pane_->model();
+    if (m.loading)
+        return true;
+    for (int i = 0; i < m.count(); ++i)
+        if (m.entries[size_t(i)].is_dir && App::get().sizes().pending(m.path(i)))
+            return true;
+    return false;
+}
+
+void SpaceView::layout_buttons() {
+    // Files' space_map_view.rs: row 1 at y (the hidden toggle on the
+    // right), row 2 at y + 34, Marks at y + 64 on the right.
+    buttons_.clear();
+    const int X = x(), Y = y(), W = w();
+    bool hidden = pane_->show_hidden();
+    buttons_.push_back({X + W - 186, Y, 184, 28, hidden ? fo::tr("Hide hidden") : fo::tr("Show hidden"),
+                        hidden ? "eye-off" : "eye", std::string(fo::tr("Show hidden")) + ", Ctrl+H", kHidden});
+    if (pane_->can_go_up())
+        buttons_.push_back({X, Y + 34, 82, 28, fo::tr("Back"), "arrow-up", "", kBack});
+    buttons_.push_back({X + 88, Y + 34, 112, 28, fo::tr("Recalculate"), "refresh-cw",
+                        fo::tr("Refresh the Space calculation"), kRecalc});
+    if (scanning())
+        buttons_.push_back({X + 206, Y + 34, 36, 28, "", "x", fo::tr("Cancel the Space calculation"), kCancel});
+    buttons_.push_back({X + W - 66, Y + 64, 66, 24, fo::tr("Marks"), "", fo::tr("Selection tools"), kMarks});
+    if (int(rows_.size()) > kListRows) {
+        buttons_.push_back({X + W - 64, list_y_ + 8, 28, 22, "\xE2\x86\x91", "", "", kListUp});
+        buttons_.push_back({X + W - 30, list_y_ + 8, 28, 22, "\xE2\x86\x93", "", "", kListDown});
+    }
+}
+
+int SpaceView::button_at(int ex, int ey) const {
+    for (size_t i = 0; i < buttons_.size(); ++i) {
+        const Btn &b = buttons_[i];
+        if (ex >= b.x && ex < b.x + b.w && ey >= b.y && ey < b.y + b.h)
+            return int(i);
+    }
+    return -1;
+}
+
+int SpaceView::row_at(int ex, int ey) const {
+    int top = list_y_ + 32;
+    if (rows_.empty() || ey < top || ex < x() || ex >= x() + w())
+        return -1;
+    int r = row_top_ + (ey - top) / kRow;
+    int last = std::min(int(rows_.size()), row_top_ + kListRows);
+    return r < last ? r : -1;
+}
+
+void SpaceView::press(int id) {
+    switch (id) {
+    case kHidden: pane_->toggle_hidden(); break;
+    case kBack: pane_->go_up(); break;
+    case kRecalc: pane_->measure_listed(); break;
+    case kCancel:
+        App::get().sizes().cancel();
+        layout();
+        break;
+    case kMarks: {
+        std::vector<fo::MenuItem> m = {
+            fo::MenuItem(fo::tr("Select all"), "Ctrl+A", [this] { pane_->select_all(); }).with_icon("square-check"),
+            fo::MenuItem(fo::tr("Invert selection"), "Ctrl+I", [this] { pane_->invert_selection(); }),
+            fo::MenuItem(fo::tr("Clear selection"), "Ctrl+Shift+D", [this] { pane_->clear_selection(); })
+                .with_icon("x"),
+        };
+        const Btn *b = nullptr;
+        for (const auto &k : buttons_)
+            if (k.id == kMarks)
+                b = &k;
+        if (b)
+            fo::PopupMenu::open_below(pane_->win(), b->x, b->y, b->w, b->h, m, true);
+        break;
+    }
+    case kListUp: row_top_ = std::max(0, row_top_ - kListRows); break;
+    case kListDown: row_top_ = std::min(std::max(0, int(rows_.size()) - kListRows), row_top_ + kListRows); break;
+    }
+    redraw();
+}
+
+void SpaceView::focus_row(int r) {
+    if (r < 0 || r >= int(rows_.size()))
+        return;
+    row_focus_ = r;
+    focus_ = -1;
+    if (r < row_top_)
+        row_top_ = r;
+    if (r >= row_top_ + kListRows)
+        row_top_ = r - kListRows + 1;
+    pane_->files()->set_current(rows_[size_t(r)].index, true);
+    redraw();
 }
 
 int SpaceView::block_at(int ex, int ey) const {
@@ -193,6 +317,7 @@ void SpaceView::focus_block(int b) {
     if (b < 0 || b >= int(blocks_.size()))
         return;
     focus_ = b;
+    row_focus_ = -1;
     pane_->files()->set_current(blocks_[size_t(b)].index, true);
     redraw();
 }
@@ -206,19 +331,50 @@ int SpaceView::handle(int event) {
     case FL_ENTER:
     case FL_MOVE: {
         int b = block_at(Fl::event_x(), Fl::event_y());
-        if (b != hover_) {
+        int k = button_at(Fl::event_x(), Fl::event_y());
+        if (b != hover_ || k != hover_button_) {
             hover_ = b;
+            hover_button_ = k;
             redraw();
         }
         return 1;
     }
     case FL_LEAVE:
         hover_ = -1;
+        hover_button_ = -1;
         redraw();
         return 1;
+    case FL_MOUSEWHEEL:
+        if (rows_.size() > size_t(kListRows) && Fl::event_y() >= list_y_) {
+            row_top_ = std::clamp(row_top_ + (Fl::event_dy() > 0 ? 1 : -1), 0, int(rows_.size()) - kListRows);
+            redraw();
+            return 1;
+        }
+        return 0;
     case FL_PUSH: {
         take_focus();
         pane_->win()->set_active(pane_);
+        int k = button_at(Fl::event_x(), Fl::event_y());
+        if (k >= 0 && Fl::event_button() == FL_LEFT_MOUSE) {
+            int id = buttons_[size_t(k)].id;
+            // The pane may relist (and this view relayout) under the press.
+            Fl::add_timeout(0, [](void *d) {
+                auto *pr = static_cast<std::pair<SpaceView *, int> *>(d);
+                pr->first->press(pr->second);
+                delete pr;
+            }, new std::pair<SpaceView *, int>(this, id));
+            return 1;
+        }
+        int r = row_at(Fl::event_x(), Fl::event_y());
+        if (r >= 0) {
+            focus_row(r);
+            int index = rows_[size_t(r)].index;
+            if (Fl::event_button() == FL_RIGHT_MOUSE)
+                pane_->context_menu(index, Fl::event_x(), Fl::event_y());
+            else if (Fl::event_clicks())
+                pane_->open_index(index);
+            return 1;
+        }
         int b = block_at(Fl::event_x(), Fl::event_y());
         if (b >= 0) {
             focus_block(b);
@@ -233,11 +389,39 @@ int SpaceView::handle(int event) {
         if (Fl::event_state() & (FL_CTRL | FL_ALT | FL_META))
             return 0;
         int k = Fl::event_key();
+        if (row_focus_ >= 0) {
+            // In the list: Up and Down move; Up from the first row goes
+            // back to the map.
+            switch (k) {
+            case FL_Up:
+                if (row_focus_ == 0) {
+                    row_focus_ = -1;
+                    focus_block(blocks_.empty() ? -1 : int(blocks_.size()) - 1);
+                } else {
+                    focus_row(row_focus_ - 1);
+                }
+                return 1;
+            case FL_Down: focus_row(std::min(int(rows_.size()) - 1, row_focus_ + 1)); return 1;
+            case FL_Page_Up: focus_row(std::max(0, row_focus_ - kListRows)); return 1;
+            case FL_Page_Down: focus_row(std::min(int(rows_.size()) - 1, row_focus_ + kListRows)); return 1;
+            case FL_Enter:
+            case FL_KP_Enter: pane_->open_index(rows_[size_t(row_focus_)].index); return 1;
+            }
+            return 0;
+        }
         switch (k) {
         case FL_Left: focus_block(nearest(focus_, -1, 0)); return 1;
         case FL_Right: focus_block(nearest(focus_, 1, 0)); return 1;
         case FL_Up: focus_block(nearest(focus_, 0, -1)); return 1;
-        case FL_Down: focus_block(nearest(focus_, 0, 1)); return 1;
+        case FL_Down: {
+            // Down from the map's bottom edge enters the list (Files).
+            int n = nearest(focus_, 0, 1);
+            if ((n == focus_ || blocks_.empty()) && !rows_.empty())
+                focus_row(0);
+            else
+                focus_block(n);
+            return 1;
+        }
         case FL_Home: focus_block(0); return 1;
         case FL_End: focus_block(int(blocks_.size()) - 1); return 1;
         case FL_Enter:
@@ -257,8 +441,40 @@ void SpaceView::draw() {
     fl_push_clip(x(), y(), w(), h());
     fo::paint::fill(x(), y(), w(), h(), t.background());
     const FolderModel &m = pane_->model();
-    std::string head = std::string(fo::tr("Space")) + " \xC2\xB7 " + fo::i18n::arg(fo::tr("%1 shown"), si_size(total_));
-    fo::text::draw(head, x(), y(), w() - 8, 24, t.bright_foreground(), fo::text::REGULAR, 13);
+    const int r6 = t.radius() > 0 ? 6 : 0;
+    // Files' Space toolbar.
+    bool busy = scanning();
+    std::string head = std::string(fo::tr("Space")) + " \xC2\xB7 " +
+                       (m.loading ? std::string(fo::tr("calculating\xE2\x80\xA6"))
+                                  : fo::i18n::arg(fo::tr("%1 visible"), si_size(total_)) +
+                                        (partial_ ? std::string(" \xC2\xB7 ") + fo::tr("partial") : std::string()));
+    fo::text::draw(head, x(), y() + 2, w() - 194, 28, t.foreground(), fo::text::REGULAR, 13);
+    for (size_t i = 0; i < buttons_.size(); ++i) {
+        const Btn &b = buttons_[i];
+        bool hot = int(i) == hover_button_;
+        fo::paint::round_fill(b.x, b.y, b.w, b.h, b.id >= kListUp ? (r6 ? 4 : 0) : r6,
+                              hot ? fo::mix(t.card(), t.selection(), 0.5) : t.card());
+        int tx = b.x + 8;
+        if (!b.icon.empty()) {
+            fo::icon::draw(b.icon, b.label.empty() ? b.x + (b.w - 13) / 2 : tx, b.y + (b.h - 13) / 2, 13, t.accent());
+            tx += 20;
+        }
+        if (!b.label.empty())
+            fo::text::draw(b.label, b.id >= kListUp ? b.x : tx, b.y, b.id >= kListUp ? b.w : b.x + b.w - tx - 4, b.h,
+                           b.id >= kListUp ? t.foreground() : t.accent(), fo::text::REGULAR, 12,
+                           b.id >= kListUp ? FL_ALIGN_CENTER : FL_ALIGN_LEFT);
+    }
+    if (!m.loading) {
+        std::string tot = fo::i18n::arg(fo::tr("Apparent total %1"), (partial_ ? "\xE2\x89\xA5" : "") + si_size(total_));
+        if (pane_->show_hidden())
+            tot += std::string(" \xC2\xB7 ") + fo::tr("incl. hidden");
+        int tx = x() + (busy ? 248 : 206);
+        fo::text::draw(tot, tx, y() + 34, std::max(0, x() + w() - tx), 28, t.dim(), fo::text::REGULAR, 10);
+    }
+    fo::text::draw(fo::tr("Observation \xC2\xB7 F5 or Recalculate refreshes"), x(), y() + 66, w() - 74, 18, t.dim(),
+                   fo::text::REGULAR, 10);
+    fo::text::draw(fo::tr("Subfolders not watched \xC2\xB7 not a snapshot"), x(), y() + 88, w() - 8, 18, t.dim(),
+                   fo::text::REGULAR, 10);
     for (size_t b = 0; b < blocks_.size(); ++b) {
         const Block &k = blocks_[b];
         if (k.w < 1 || k.h < 1)
@@ -274,7 +490,9 @@ void SpaceView::draw() {
             fo::paint::round_frame(bx + 1, by + 1, k.w - 2, k.h - 2, 0, 2, t.bright_foreground());
             fo::paint::round_frame(bx + 3, by + 3, k.w - 6, k.h - 6, 0, 1, t.background());
         }
-        if (k.w > 56 && k.h > 36) {
+        if (pane_->files()->selected(k.index) && k.w > 6 && k.h > 6)
+            fo::paint::round_frame(bx + 2, by + 2, k.w - 4, k.h - 4, 0, 2, t.selection());
+        if (k.w >= kLabelW && k.h >= kLabelH) {
             fl_push_clip(bx + 4, by + 2, k.w - 8, k.h - 4);
             fo::icon::draw(e.is_dir ? "folder" : "image", bx + 8, by + 9, 11, t.background());
             fo::text::draw(display_name(e), bx + 24, by + 4, k.w - 28, 20, t.background(), fo::text::REGULAR, 11);
@@ -282,15 +500,41 @@ void SpaceView::draw() {
             fl_pop_clip();
         }
     }
-    std::string foot = fo::i18n::arg(fo::tr("Without area: %1"), std::to_string(unsized_)) + " \xC2\xB7 " +
-                       std::string(fo::tr("Enter opens a folder \xC2\xB7 Backspace goes up"));
-    fo::text::draw(foot, x(), y() + h() - kFooter, w(), kFooter, t.dim(), fo::text::REGULAR, 11);
+    if (blocks_.empty() && !m.loading)
+        fo::text::draw(m.count() == 0 ? std::string(fo::tr("Empty folder")) + " \xC2\xB7 0 B"
+                                      : std::string(fo::tr("No complete positive sizes to show")),
+                       x(), map_y_, w(), 50, t.dim(), fo::text::REGULAR, 12, FL_ALIGN_CENTER);
+    // Files' "No area/label" list under the map.
+    if (!rows_.empty()) {
+        std::string lh = fo::i18n::arg(fo::tr("No area/label \xC2\xB7 %1 \xC2\xB7 wheel / \xE2\x86\x91\xE2\x86\x93"),
+                                       std::to_string(rows_.size()));
+        fo::text::draw(lh, x(), list_y_ + 8, w() - 70, 22, t.dim(), fo::text::REGULAR, 10);
+        int top = list_y_ + 32;
+        fl_push_clip(x(), top, w(), kRow * kListRows);
+        for (int r = row_top_; r < std::min(int(rows_.size()), row_top_ + kListRows); ++r) {
+            const Row &row = rows_[size_t(r)];
+            int ry = top + (r - row_top_) * kRow;
+            if (pane_->files()->selected(row.index))
+                fo::paint::round_fill(x(), ry, w() - 4, kRow - 2, r6 ? 4 : 0, t.selection());
+            if (r == row_focus_) {
+                fo::paint::fill(x() + 1, ry + 4, 2, kRow - 10, t.accent());
+                if (Fl::focus() == this)
+                    fo::paint::round_frame(x(), ry, w() - 4, kRow - 2, r6 ? 4 : 0, 1, t.accent());
+            }
+            const Entry &e = m.entries[size_t(row.index)];
+            fo::text::draw(display_name(e) + " \xC2\xB7 " + row.state, x() + 6, ry, w() - 16, kRow - 2, t.foreground(),
+                           fo::text::REGULAR, 11, FL_ALIGN_LEFT, fo::text::Elide::Middle);
+        }
+        fl_pop_clip();
+    }
+    fo::text::draw(fo::tr("Folders include hidden descendants"), x(), y() + h() - 22, w(), 22, t.dim(),
+                   fo::text::REGULAR, 10);
     // The tooltip of the pointed block, or of a focused one too small for
     // its own label (Files' Space tooltips).
     int tip = hover_ >= 0 ? hover_ : -1;
     if (tip < 0 && focus_ >= 0 && Fl::focus() == this) {
         const Block &k = blocks_[size_t(focus_)];
-        if (!(k.w > 56 && k.h > 36))
+        if (!(k.w >= kLabelW && k.h >= kLabelH))
             tip = focus_;
     }
     if (tip >= 0) {

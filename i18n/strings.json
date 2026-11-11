@@ -52,10 +52,6 @@
   "plural": false
  },
  {
-  "source": "%1 shown",
-  "plural": false
- },
- {
   "source": "%1 visible",
   "plural": false
  },
@@ -101,6 +97,10 @@
  },
  {
   "source": "Actions / Preferences",
+  "plural": false
+ },
+ {
+  "source": "Apparent total %1",
   "plural": false
  },
  {
@@ -152,7 +152,15 @@
   "plural": false
  },
  {
+  "source": "calculating…",
+  "plural": false
+ },
+ {
   "source": "Cancel",
+  "plural": false
+ },
+ {
+  "source": "Cancel the Space calculation",
   "plural": false
  },
  {
@@ -420,6 +428,10 @@
   "plural": false
  },
  {
+  "source": "Empty folder",
+  "plural": false
+ },
+ {
   "source": "Empty the trash?",
   "plural": false
  },
@@ -433,10 +445,6 @@
  },
  {
   "source": "Enter / double click",
-  "plural": false
- },
- {
-  "source": "Enter opens a folder · Backspace goes up",
   "plural": false
  },
  {
@@ -476,6 +484,10 @@
   "plural": false
  },
  {
+  "source": "Folders include hidden descendants",
+  "plural": false
+ },
+ {
   "source": "Font",
   "plural": false
  },
@@ -512,6 +524,10 @@
   "plural": false
  },
  {
+  "source": "Hide hidden",
+  "plural": false
+ },
+ {
   "source": "Hide Hidden Files",
   "plural": false
  },
@@ -525,6 +541,10 @@
  },
  {
   "source": "Image",
+  "plural": false
+ },
+ {
+  "source": "incl. hidden",
   "plural": false
  },
  {
@@ -549,6 +569,10 @@
  },
  {
   "source": "Kind",
+  "plural": false
+ },
+ {
+  "source": "label in list",
   "plural": false
  },
  {
@@ -581,6 +605,10 @@
  },
  {
   "source": "Mark filtered and show all",
+  "plural": false
+ },
+ {
+  "source": "Marks",
   "plural": false
  },
  {
@@ -660,6 +688,18 @@
   "plural": false
  },
  {
+  "source": "no area",
+  "plural": false
+ },
+ {
+  "source": "No area/label · %1 · wheel / ↑↓",
+  "plural": false
+ },
+ {
+  "source": "No complete positive sizes to show",
+  "plural": false
+ },
+ {
   "source": "No matches",
   "plural": false
  },
@@ -681,6 +721,10 @@
  },
  {
   "source": "now",
+  "plural": false
+ },
+ {
+  "source": "Observation · F5 or Recalculate refreshes",
   "plural": false
  },
  {
@@ -721,6 +765,10 @@
  },
  {
   "source": "Open with…",
+  "plural": false
+ },
+ {
+  "source": "partial",
   "plural": false
  },
  {
@@ -797,6 +845,10 @@
  },
  {
   "source": "Redo %1",
+  "plural": false
+ },
+ {
+  "source": "Refresh the Space calculation",
   "plural": false
  },
  {
@@ -892,6 +944,10 @@
   "plural": false
  },
  {
+  "source": "Selection tools",
+  "plural": false
+ },
+ {
   "source": "Send %n items to Trash",
   "plural": true
  },
@@ -929,6 +985,10 @@
  },
  {
   "source": "Shortcut help",
+  "plural": false
+ },
+ {
+  "source": "Show hidden",
   "plural": false
  },
  {
@@ -989,6 +1049,10 @@
  },
  {
   "source": "stopped",
+  "plural": false
+ },
+ {
+  "source": "Subfolders not watched · not a snapshot",
   "plural": false
  },
  {
@@ -1104,6 +1168,10 @@
   "plural": false
  },
  {
+  "source": "Unknown size",
+  "plural": false
+ },
+ {
   "source": "Unpin",
   "plural": false
  },
@@ -1153,10 +1221,6 @@
  },
  {
   "source": "Window: Normal",
-  "plural": false
- },
- {
-  "source": "Without area: %1",
   "plural": false
  },
  {

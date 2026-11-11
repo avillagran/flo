@@ -868,6 +868,8 @@ void Pane::selection_changed() {
         redraw(); // the footer's marks
     if (view_ == View::Columns)
         columns_->selection_changed();
+    if (view_ == View::Space && !dual_)
+        space_->redraw(); // marks
     win_->pane_selected(this);
     PreviewClient &pv = App::get().preview();
     if (pv.running() && pv.owner() == this) {
@@ -2039,6 +2041,11 @@ void Pane::measure_listed() {
     if (!folders.empty())
         App::get().sizes().request(folders, true);
     win_->sizes_changed();
+}
+
+void Pane::sizes_arrived() {
+    if (view_ == View::Space && !dual_ && visible())
+        space_->sync();
 }
 
 void Pane::sort_clicked(int column) {

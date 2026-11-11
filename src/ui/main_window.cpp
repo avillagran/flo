@@ -592,8 +592,10 @@ void MainWindow::pane_view_changed(Pane *p) {
 
 void MainWindow::sizes_changed() {
     for (Pane *p : tabs_)
-        if (p->visible())
+        if (p->visible()) {
+            p->sizes_arrived();
             p->redraw();
+        }
     if (dual_)
         dual_->redraw();
     details_->show_from(active_pane());
@@ -1162,7 +1164,13 @@ void MainWindow::build_shortcuts() {
     on("Ctrl+Alt+I", [this] { toggle_details(); });
     on("F10", [this] { actions_menu(); });
     on("Ctrl+,", [this] { preferences_menu(); });
-    on("F5", [P] { P()->transfer(false); });
+    // Files: F5 recalculates in the Space view, copies everywhere else.
+    on("F5", [P, this] {
+        if (P()->view() == Pane::View::Space && !split())
+            P()->measure_listed();
+        else
+            P()->transfer(false);
+    });
     on("F6", [P] { P()->transfer(true); });
     on("F2", [P] { P()->rename(); });
     on("F7", [P] { P()->new_folder(); });

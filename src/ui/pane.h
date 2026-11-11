@@ -127,6 +127,8 @@ public:
     // the listed folders.
     void measure_focused();
     void measure_listed();
+    // A folder size arrived (or measuring stopped): the Space map relays.
+    void sizes_arrived();
     // Type-to-filter (Files): only the names matching `text` show.
     void set_filter(const std::string &text);
     const std::string &filter() const { return filter_; }
