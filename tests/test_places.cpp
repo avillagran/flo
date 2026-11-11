@@ -2,7 +2,9 @@
 #include "harness.h"
 
 #include "core/dbus_service.h"
+#include "core/event_queue.h"
 #include "core/fsutil.h"
+#include "core/mounter.h"
 #include "core/network.h"
 #include "core/places.h"
 #include "core/recents.h"
@@ -10,6 +12,7 @@
 #include "core/xdg.h"
 
 #include <cstdlib>
+#include <functional>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -154,6 +157,91 @@ TEST(physical_drives_skip_the_system) {
     CHECK_EQ(drives.size(), static_cast<std::size_t>(2));
     CHECK(drives.size() == 2 && drives[0].path == "/data" && drives[0].name == "Big Data" && !drives[0].removable);
     CHECK(drives.size() == 2 && drives[1].path == "/run/media/u/USB" && drives[1].removable && drives[1].name == "USB");
+}
+
+namespace {
+bool pump(EventQueue &q, const std::function<bool()> &done, int ms = 5000) {
+    for (int waited = 0; waited < ms && !done(); waited += 20) {
+        q.wait(20);
+        q.dispatch();
+    }
+    return done();
+}
+} // namespace
+
+TEST(fake_gvfs_drives_the_mount_operation) {
+    const std::string d = private_dir("fake-gvfs");
+    ::setenv("FLO_TEST_FAKE_GVFS", d.c_str(), 1);
+    EventQueue q;
+    Mounter m(q);
+    std::vector<MountRequest> asked;
+    std::string mounted, failed = "-";
+    MountCallbacks cb;
+    cb.on_request = [&](const MountRequest &r) { asked.push_back(r); };
+    cb.on_mounted = [&](const std::string &local, const std::string &) { mounted = local; };
+    cb.on_failed = [&](const std::string &e) { failed = e; };
+    // An unknown host: the host-key question reaches the UI, then the password.
+    CHECK(m.mount("sftp://box.example/", false, cb));
+    CHECK(pump(q, [&] { return asked.size() == 1; }));
+    CHECK(asked.size() == 1 && asked[0].kind == MountRequest::Question && asked[0].choices.size() == 2 &&
+          asked[0].message.find("box.example") != std::string::npos);
+    m.reply_choice(asked[0].id, 0);
+    CHECK(pump(q, [&] { return asked.size() == 2; }));
+    CHECK(asked.size() == 2 && asked[1].kind == MountRequest::Password && !asked[1].needs_user);
+    m.reply_password(asked[1].id, "", "wrong");
+    CHECK(pump(q, [&] { return asked.size() == 3; })); // asked again
+    m.reply_password(asked[2].id, "", "flo-test");
+    CHECK(pump(q, [&] { return !mounted.empty(); }));
+    CHECK_EQ(mounted, d + "/sftp:host=box.example");
+    // A tailnet machine: the question is answered without asking.
+    asked.clear();
+    mounted.clear();
+    CHECK(m.mount("sftp://laptop.tail1234.ts.net/", true, cb));
+    CHECK(pump(q, [&] { return asked.size() == 1; }));
+    CHECK(asked.size() == 1 && asked[0].kind == MountRequest::Password);
+    m.abort(asked[0].id); // Cancel in the dialog: no error shown
+    CHECK(pump(q, [&] { return failed != "-"; }));
+    CHECK_EQ(failed, std::string());
+    CHECK(mounted.empty());
+    ::unsetenv("FLO_TEST_FAKE_GVFS");
+}
+
+TEST(mountinfo_fixture_lists_and_ejects_drives) {
+    const std::string d = private_dir("mounts");
+    const std::string fixture = write_file(d + "/mountinfo",
+        "22 1 259:2 / / rw,relatime shared:1 - btrfs /dev/nvme0n1p2 rw\n"
+        "40 22 8:17 / /run/media/me/FLO\\040USB rw,nosuid shared:9 - vfat /dev/sdb1 rw\n"
+        "41 22 0:5 / /proc rw shared:2 - proc proc rw\n");
+    ::setenv("FLO_TEST_MOUNTINFO", fixture.c_str(), 1);
+    auto list = places::drives();
+    CHECK_EQ(list.size(), std::size_t(1));
+    CHECK(list.size() == 1 && list[0].path == "/run/media/me/FLO USB" && list[0].removable && list[0].can_unmount);
+    EventQueue q;
+    Devices dev(q);
+    std::vector<std::vector<Place>> updates;
+    dev.watch([&](std::vector<Place> p) { updates.push_back(p); });
+    CHECK(pump(q, [&] { return !updates.empty(); }));
+    bool done = false, ok = false;
+    dev.eject("/run/media/me/FLO USB", [&](bool k, const std::string &, const std::string &) {
+        done = true;
+        ok = k;
+    });
+    CHECK(pump(q, [&] { return done; }));
+    CHECK(ok);
+    CHECK(places::drives().empty());
+    CHECK(read_file(fixture).find("FLO\\040USB") == std::string::npos);
+    CHECK(read_file(fixture).find("/proc") != std::string::npos); // the rest is kept
+    CHECK_EQ(read_file(std::string(std::getenv("FLO_TEST_RUN")) + "/ejects.log"), std::string("eject /run/media/me/FLO USB\n"));
+    CHECK(pump(q, [&] { return updates.size() >= 2 && updates.back().empty(); }));
+    ::unsetenv("FLO_TEST_MOUNTINFO");
+    // Outside a private run the hooks do nothing.
+    const char *run = std::getenv("FLO_TEST_RUN");
+    std::string keep = run;
+    ::setenv("FLO_TEST_MOUNTINFO", fixture.c_str(), 1);
+    ::unsetenv("FLO_TEST_RUN");
+    CHECK_EQ(xdg::test_hook("FLO_TEST_MOUNTINFO"), std::string());
+    ::setenv("FLO_TEST_RUN", keep.c_str(), 1);
+    ::unsetenv("FLO_TEST_MOUNTINFO");
 }
 
 TEST(filemanager1_uris) {

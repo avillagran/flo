@@ -27,4 +27,13 @@ std::vector<std::pair<std::string, std::string>> parse_user_dirs(const std::stri
 // Finds an executable in $PATH (or checks an absolute/relative path).
 std::string find_program(const std::string &name);
 
+// Test hooks: the value of environment variable `name`, but only inside a
+// private test run (FLO_TEST_RUN is set by tests/run-isolated.sh and
+// tools/gui-session.sh); always "" otherwise, so a stray variable never
+// changes how Flo behaves for a user. Hooks: FLO_TEST_MOUNTINFO (a
+// mountinfo fixture instead of /proc/self/mountinfo, with fake unmount and
+// eject of its drives) and FLO_TEST_FAKE_GVFS (a folder standing in for
+// GVfs mounts, driving the real GMountOperation questions).
+std::string test_hook(const char *name);
+
 } // namespace flo::xdg

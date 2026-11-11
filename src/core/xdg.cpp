@@ -138,4 +138,12 @@ std::string find_program(const std::string &name) {
     return {};
 }
 
+std::string test_hook(const char *name) {
+    const char *run = std::getenv("FLO_TEST_RUN");
+    if (!run || !*run)
+        return {};
+    const char *v = std::getenv(name);
+    return v ? v : "";
+}
+
 } // namespace flo::xdg

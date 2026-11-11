@@ -1,4 +1,5 @@
 #include "core/fsutil.h"
+#include "core/xdg.h"
 
 #include <cctype>
 #include <cerrno>
@@ -347,6 +348,11 @@ std::vector<MountInfo> parse_mountinfo(const std::string &text) {
 
 std::vector<MountInfo> read_mountinfo() {
     std::string text;
+    const std::string fixture = xdg::test_hook("FLO_TEST_MOUNTINFO");
+    if (!fixture.empty()) {
+        read_file_capped(fixture, 1u << 20, text);
+        return parse_mountinfo(text);
+    }
     // /proc files report size 0; read in a loop instead of read_file_capped.
     FILE *f = std::fopen("/proc/self/mountinfo", "re");
     if (!f)

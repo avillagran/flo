@@ -1,4 +1,5 @@
 #include "core/places.h"
+#include "core/fsutil.h"
 #include "core/gmain_thread.h"
 #include "core/natural_sort.h"
 #include "core/trash.h"
@@ -463,10 +464,45 @@ void Devices::mount(const std::string &volume_id, Done done) {
     });
 }
 
+// Test hook (FLO_TEST_MOUNTINFO, inside a private test run only): a drive
+// from the mountinfo fixture is "unmounted" by taking its line out of the
+// fixture, and the run's ejects.log records it. Nothing on the system is
+// touched.
+static bool fixture_unmount(const std::string &path, bool eject) {
+    const std::string fixture = xdg::test_hook("FLO_TEST_MOUNTINFO");
+    std::string text;
+    if (fixture.empty() || !read_file_capped(fixture, 1u << 20, text))
+        return false;
+    std::string kept;
+    bool found = false;
+    std::istringstream in(text);
+    std::string line;
+    while (std::getline(in, line)) {
+        auto rows = parse_mountinfo(line);
+        if (!found && rows.size() == 1 && rows[0].root_path == path) {
+            found = true;
+            continue;
+        }
+        kept += line + "\n";
+    }
+    if (!found || !atomic_write_file(fixture, kept, 0600))
+        return false;
+    const std::string run = xdg::test_hook("FLO_TEST_RUN");
+    std::string log;
+    read_file_capped(run + "/ejects.log", 1u << 20, log);
+    atomic_write_file(run + "/ejects.log", log + (eject ? "eject " : "unmount ") + path + "\n", 0600);
+    return true;
+}
+
 static void unmount_or_eject(const std::shared_ptr<Devices::Impl> &impl, const std::string &path, Devices::Done done,
                              bool eject) {
     GMainThread::instance().invoke([impl, path, done, eject] {
         auto *d = new OpData{impl, impl->poster, done, path};
+        if (fixture_unmount(path, eject)) {
+            finish(d, true, path, nullptr);
+            impl->refresh();
+            return;
+        }
         GFile *file = g_file_new_for_path(path.c_str());
         GMount *m = g_file_find_enclosing_mount(file, nullptr, nullptr);
         g_object_unref(file);
