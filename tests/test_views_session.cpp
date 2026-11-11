@@ -4,6 +4,9 @@
 
 #include "core/folder_views.h"
 #include "core/session.h"
+#include "core/uri.h"
+
+#include <sys/stat.h>
 
 using namespace flo;
 using namespace flo_test;
@@ -111,4 +114,60 @@ TEST(session_rejects_broken_files_whole) {
     std::string dir = private_dir("session-missing");
     CHECK(!Session::load(out, dir + "/none"));
     CHECK(out.tabs.empty());
+}
+
+#include "core/places.h"
+#include "core/starred.h"
+
+TEST(starred_toggle_round_trip_and_limits) {
+    std::string dir = private_dir("starred");
+    std::string file = dir + "/starred";
+    Starred s;
+    CHECK(s.load(file));
+    CHECK_EQ(s.toggle({"/a", "/b c"}), 2);
+    CHECK_EQ(s.toggle({"/a", "/d"}), 1);   // not all starred: star the rest
+    CHECK_EQ(s.toggle({"/a", "/d"}), -2);  // all starred: unstar them
+    CHECK(s.contains("/b c") && !s.contains("/a"));
+    CHECK(s.add({"/x\ny"}));
+    CHECK(s.save(file));
+    Starred r;
+    CHECK(r.load(file));
+    CHECK(r.items() == std::vector<std::string>({"/b c", "/x\ny"}));
+    std::vector<std::string> out;
+    CHECK(Starred::parse("# x\n\nfile:///a\nfile:///a\nhttp://h/b\nfile:///c\r\n", out));
+    CHECK(out == std::vector<std::string>({"/a", "/c"}));
+    CHECK(!Starred::parse("\xff\xfe", out));
+    std::string bad = write_file(dir + "/bad", "\xff\xfe junk\n");
+    Starred b;
+    CHECK(!b.load(bad));
+    CHECK(!b.writable());
+    CHECK_EQ(b.toggle({"/a"}), 0);
+    CHECK(!b.save(bad));
+    CHECK_EQ(read_file(bad), std::string("\xff\xfe junk\n"));
+    Starred big;
+    std::vector<std::string> many;
+    for (int i = 0; i < 10000; ++i)
+        many.push_back("/m/" + std::to_string(i));
+    CHECK(big.add(many));
+    CHECK(!big.add({"/one/more"}));
+    CHECK_EQ(big.items().size(), size_t(10000));
+}
+
+TEST(favorite_labels_rewrite_only_their_line) {
+    std::string dir = private_dir("favorites");
+    std::string f1 = dir + "/a";
+    std::string f2 = dir + "/b c";
+    CHECK(::mkdir(f1.c_str(), 0700) == 0 && ::mkdir(f2.c_str(), 0700) == 0);
+    std::string file = write_file(dir + "/bookmarks",
+                                  "sftp://host/x Server\n" + path_to_uri(f1) + "\n" + path_to_uri(f2) + " Old\n");
+    CHECK_EQ(places::relabel(f2, "  New label ", file), std::string());
+    CHECK_EQ(places::relabel(f1, "Alpha", file), std::string());
+    CHECK_EQ(read_file(file), "sftp://host/x Server\n" + path_to_uri(f1) + " Alpha\n" + path_to_uri(f2) + " New label\n");
+    CHECK_EQ(places::relabel(f2, "", file), std::string());
+    CHECK(read_file(file).find(path_to_uri(f2) + "\n") != std::string::npos);
+    CHECK(!places::relabel(dir, "x", file).empty()); // not a favorite
+    CHECK(!places::relabel(f1, std::string(97, 'x'), file).empty());
+    CHECK(!places::relabel(f1, "a\tb", file).empty());
+    CHECK_EQ(places::default_label(f2), std::string("b c"));
+    CHECK_EQ(places::default_label("/" + std::string(120, 'z')).size(), size_t(96));
 }

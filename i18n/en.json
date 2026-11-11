@@ -1,7 +1,10 @@
 {
  "%n commands": {"one": "%n command", "other": "%n commands"},
  "%n entries": {"one": "%n entry", "other": "%n entries"},
+ "%n favorites": {"one": "%n favorite", "other": "%n favorites"},
  "%n items": {"one": "%n item", "other": "%n items"},
+ "%n items removed from starred": {"one": "%n item removed from starred", "other": "%n items removed from starred"},
+ "%n items starred": {"one": "%n item starred", "other": "%n items starred"},
  "%n items will be deleted permanently. This can't be undone.": {"one": "%n item will be deleted permanently. This can't be undone.", "other": "%n items will be deleted permanently. This can't be undone."},
  "%n marked": {"one": "%n marked", "other": "%n marked"},
  "%n thumbnails": {"one": "%n thumbnail", "other": "%n thumbnails"},

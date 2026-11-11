@@ -7,6 +7,7 @@
 #include "core/network.h"
 #include "core/places.h"
 #include "core/recents.h"
+#include "core/starred.h"
 #include "core/trash.h"
 #include "core/uri.h"
 #include "core/xdg.h"
@@ -111,7 +112,7 @@ void Pane::relabel() {
         win_->pane_view_changed(this);
     }
     list_header_->columns(list_header_columns());
-    files()->empty_text(query_.empty() ? fo::tr("Empty") : fo::tr("No matches"));
+    files()->empty_text(empty_label());
     redraw();
 }
 
@@ -177,7 +178,19 @@ std::vector<fo::SortHeader::Column> Pane::list_header_columns() const {
     return {{fo::tr("Name"), "sort"}, {fo::tr("Size"), "database"}, {fo::tr("Date"), "clock"}, {fo::tr("Type"), "file"}};
 }
 
+std::string Pane::empty_label() const {
+    if (!query_.empty() || !filter_.empty())
+        return fo::tr("No matches");
+    if (in_starred())
+        return fo::tr("No starred items \xC2\xB7 Ctrl+E stars the focused item in any folder");
+    if (in_recents())
+        return fo::tr("No recent files");
+    return fo::tr("Empty");
+}
+
 std::string Pane::title() const {
+    if (in_starred())
+        return fo::tr("Starred");
     if (in_recents())
         return fo::tr("Recents");
     if (folder_ == trash::home_trash() + "/files")
@@ -312,8 +325,8 @@ void Pane::order_for_view() {
 void Pane::navigate(const std::string &path, const std::string &select, bool history) {
     if (path.empty())
         return;
-    std::string p = path == kRecents ? path : clean_path(path);
-    if (p != kRecents && !is_dir(p)) {
+    std::string p = is_virtual_folder(path) ? path : clean_path(path);
+    if (!is_virtual_folder(p) && !is_dir(p)) {
         show_message(fo::i18n::arg(fo::tr("%1 can't be opened."), quoted(tilde(p))));
         return;
     }
@@ -372,8 +385,9 @@ void Pane::after_folder_change() {
         columns_->sync();
     if (view_ == View::Space && !dual_)
         space_->sync();
-    files()->empty_text(fo::tr("Empty"));
-    files()->show_folders(false);
+    files()->empty_text(empty_label());
+    // Recents and Starred show each item's folder beside its name.
+    files()->show_folders(in_recents());
     place_children();
     win_->pane_moved(this);
     redraw();
@@ -382,7 +396,7 @@ void Pane::after_folder_change() {
 void Pane::build_crumbs() {
     crumbs_.clear();
     if (in_recents()) {
-        crumbs_.push_back({fo::tr("Recents"), kRecents});
+        crumbs_.push_back({title(), folder_});
         return;
     }
     const std::string trash_files = trash::home_trash() + "/files";
@@ -444,11 +458,32 @@ void Pane::list_now(bool keep) {
         std::weak_ptr<char> weak = alive_.weak();
         bool hidden = hidden_;
         Pane *self = this;
+        std::string which = folder_;
+        // Starred: newest star first. As in Files, an item that is gone stays
+        // listed (unavailable: mode 0) so it can still be taken off the list.
+        std::vector<std::string> stars;
+        if (in_starred())
+            stars.assign(App::get().starred().items().rbegin(), App::get().starred().items().rend());
         recents_exec_.clear();
-        recents_exec_.run([poster, weak, hidden, self, keep] {
-            auto l = std::make_shared<Listing>(recents::list(recents::xbel_path(), hidden));
-            poster.post([weak, l, self, keep] {
-                if (weak.expired() || !self->in_recents())
+        recents_exec_.run([poster, weak, hidden, self, keep, which, stars] {
+            std::shared_ptr<Listing> l;
+            if (which == kStarred) {
+                l = std::make_shared<Listing>();
+                l->folder = kStarred;
+                EntryOptions opt;
+                opt.sniff = false;
+                for (const auto &p : stars) {
+                    Entry e;
+                    if (!stat_path(p, e, opt))
+                        e = Entry();
+                    e.name = p; // the list spans folders: the entry carries its full path
+                    l->entries.push_back(std::move(e));
+                }
+            } else {
+                l = std::make_shared<Listing>(recents::list(recents::xbel_path(), hidden));
+            }
+            poster.post([weak, l, self, keep, which] {
+                if (weak.expired() || self->folder() != which)
                     return;
                 self->landed(l, keep);
             });
@@ -1021,6 +1056,21 @@ void Pane::delete_selected() {
     auto paths = selected_paths();
     if (paths.empty())
         return;
+    if (in_starred()) {
+        // Files: Delete takes the entry off the list; the file is not touched.
+        Starred &st = App::get().starred();
+        int n = st.remove(paths);
+        if (n > 0 && st.save()) {
+            fo::Toast::show(win_, n == 1 ? fo::i18n::arg(fo::tr("Removed from Starred: %1 \xC2\xB7 the file was not touched"),
+                                                          path_basename(paths[0]))
+                                         : fo::trn("%n items removed from starred", n),
+                            3);
+            reload(true);
+        }
+        return;
+    }
+    if (in_recents())
+        return;
     if (in_trash())
         confirm_delete(paths);
     else
@@ -1109,7 +1159,7 @@ void Pane::toggle_pin(const std::string &path) {
         const Entry *e = current_entry();
         target = e && e->is_dir ? current_path() : folder_;
     }
-    if (target.empty() || target == kRecents)
+    if (target.empty() || is_virtual_folder(target))
         return;
     if (places::is_pinned(target)) {
         places::unpin(target);
@@ -1123,6 +1173,35 @@ void Pane::toggle_pin(const std::string &path) {
         fo::Toast::show(win_, fo::i18n::arg(fo::tr("Pinned %1"), path_basename(target)), 2);
     }
     App::get().refresh_places();
+}
+
+void Pane::toggle_star() {
+    std::vector<std::string> paths;
+    for (const auto &p : selected_paths())
+        if (!p.empty() && p[0] == '/' && !in_trash_folder(p))
+            paths.push_back(p);
+    if (paths.empty()) {
+        fo::Toast::show(win_, fo::tr("Star: select a file or folder"), 2.5);
+        return;
+    }
+    Starred &st = App::get().starred();
+    int n = st.toggle(paths);
+    if (n == 0 || !st.save()) {
+        fo::Toast::show(win_, st.error().empty() ? fo::tr("The starred list can't be saved.") : fo::tr(st.error().c_str()),
+                        3, fo::Toast::Error);
+        if (n != 0)
+            st.load();
+        return;
+    }
+    std::string msg = n == 1    ? fo::tr("Starred \xC2\xB7 Ctrl+Alt+E opens Starred")
+                      : n > 1   ? fo::trn("%n items starred", n)
+                      : n == -1 ? fo::tr("Removed from starred")
+                                : fo::trn("%n items removed from starred", -n);
+    fo::Toast::show(win_, msg, 2.5);
+    if (in_starred())
+        reload(true);
+    else
+        files()->redraw();
 }
 
 void Pane::preview() {
@@ -1276,7 +1355,7 @@ void Pane::extract(const std::string &path) {
 }
 
 void Pane::drop_into(const std::vector<std::string> &paths, const std::string &folder) {
-    if (paths.empty() || folder.empty() || folder == kRecents)
+    if (paths.empty() || folder.empty() || is_virtual_folder(folder))
         return;
     bool all_here = std::all_of(paths.begin(), paths.end(),
                                 [&](const std::string &p) { return path_dirname(p) == folder || p == folder; });
@@ -1394,9 +1473,31 @@ std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const st
     std::vector<std::string> paths = !item ? std::vector<std::string>() : for_selection ? selected_paths()
                                                                                          : std::vector<std::string>{target};
     bool trash_view = in_trash_folder(folder) || (item && in_trash_folder(target));
-    bool recents = folder == kRecents;
+    bool recents = is_virtual_folder(folder);
     int n = int(paths.size());
     std::vector<MenuItem> m;
+    if (item && recents) {
+        // Files' menu of a Recents / Starred row: only listing commands, no
+        // file action (context_menu.rs open_virtual).
+        const bool gone = e.mode == 0;
+        const bool starred = App::get().starred().contains(target);
+        m.push_back(MenuItem(fo::tr("Open"), "Enter", [this, target] { open_path(target); })
+                        .with_icon("open")
+                        .disabled(gone));
+        m.push_back(MenuItem(fo::tr("Open containing folder"), "Ctrl+Alt+O", [this, target] { show_item(target); })
+                        .with_icon("folder-open")
+                        .disabled(!is_dir(path_dirname(target))));
+        if (folder == kStarred)
+            m.push_back(MenuItem(fo::tr("Remove from Starred (the file is not deleted)"), "Delete", [this, target] {
+                select_path(target);
+                delete_selected();
+            }).with_icon("x"));
+        m.push_back(MenuItem(starred ? fo::tr("Remove from starred") : fo::tr("Star"), "Ctrl+E", [this, target] {
+            select_path(target);
+            toggle_star();
+        }).with_icon(starred ? "star-outline" : "star"));
+        return m;
+    }
     if (item && trash_view)
         m.push_back(MenuItem(n > 1 ? fo::trn("Restore %n Items", n) : fo::tr("Restore"), "", [this, paths] { restore(paths); }));
     if (!item && trash_view)
@@ -1482,6 +1583,17 @@ std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const st
         auto share = share_menu(paths, target);
         if (!share.empty())
             m.push_back(MenuItem(fo::tr("Share"), "", nullptr, share).with_icon("share"));
+    }
+    if (item && !trash_view) {
+        bool starred = !paths.empty() && std::all_of(paths.begin(), paths.end(), [](const std::string &p) {
+            return App::get().starred().contains(p);
+        });
+        m.push_back(MenuItem(starred ? fo::tr("Remove from starred") : fo::tr("Star"), "Ctrl+E", [this, paths] {
+            for (const auto &p : paths)
+                if (model_.index_of_path(p) >= 0 && !files()->selected(model_.index_of_path(p)))
+                    select_path(p);
+            toggle_star();
+        }).with_icon(starred ? "star-outline" : "star"));
     }
     if (for_folder && !trash_view)
         m.push_back(MenuItem(places::is_pinned(target) ? fo::tr("Unpin") : fo::tr("Pin"), "Ctrl+D",
@@ -1941,7 +2053,7 @@ void Pane::set_filter(const std::string &text) {
         v->set_current(c, false);
     else if (model_.count() > 0 && !filter_.empty())
         v->set_current(0, true);
-    v->empty_text(filter_.empty() ? fo::tr("Empty") : fo::tr("No matches"));
+    v->empty_text(empty_label());
     if (view_ == View::Space && !dual_)
         space_->sync();
     win_->pane_view_changed(this);
@@ -2082,7 +2194,7 @@ void Pane::request_sizes() {
 void Pane::measure_focused() {
     const Entry *e = current_entry();
     std::string p = e && e->is_dir ? current_path() : folder_;
-    if (p.empty() || p == kRecents)
+    if (p.empty() || is_virtual_folder(p))
         return;
     App::get().sizes().request({p}, true);
     win_->sizes_changed();
@@ -2139,10 +2251,10 @@ TabState Pane::tab_state() const {
     TabState t;
     t.folder = in_recents() ? xdg::home() : folder_;
     for (const auto &b : back_)
-        if (b != kRecents)
+        if (!is_virtual_folder(b))
             t.back.push_back(b);
     for (const auto &f : forward_)
-        if (f != kRecents)
+        if (!is_virtual_folder(f))
             t.forward.push_back(f);
     while (t.back.size() + t.forward.size() > Session::kMaxHistory)
         t.back.size() > t.forward.size() ? (void)t.back.erase(t.back.begin()) : (void)t.forward.erase(t.forward.begin());

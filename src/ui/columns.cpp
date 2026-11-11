@@ -100,7 +100,7 @@ void ColumnsView::list(Column &c) {
 void ColumnsView::sync() {
     const std::string folder = pane_->folder();
     std::vector<std::pair<std::string, std::string>> want; // path, next
-    if (folder != kRecents && folder.size() > 0 && folder[0] == '/') {
+    if (!is_virtual_folder(folder) && folder.size() > 0 && folder[0] == '/') {
         std::string root = root_of(folder);
         std::vector<std::string> chain;
         for (std::string p = folder; p != root && p != "/" && !p.empty(); p = path_dirname(p))

@@ -73,6 +73,9 @@ public:
     FileView *files() const; // the view holding the selection
     const std::vector<std::pair<std::string, std::string>> &crumbs() const { return crumbs_; }
     std::string title() const;
+    // Files' empty-state line for this listing (Starred and Recents have
+    // their own).
+    std::string empty_label() const;
     bool can_back() const { return !back_.empty(); }
     bool can_forward() const { return !forward_.empty(); }
     bool can_go_up() const;
@@ -167,7 +170,14 @@ public:
     bool searching() const { return searching_; }
 
     bool in_trash() const;
-    bool in_recents() const { return folder_ == kRecents; }
+    // Recents or Starred: a list of items from many folders.
+    bool in_recents() const { return is_virtual_folder(folder_); }
+    bool in_starred() const { return folder_ == kStarred; }
+    // Ctrl+E: star the marked items (or the focused one), or unstar them
+    // when they are all starred.
+    void toggle_star();
+    const std::vector<std::string> &history_back() const { return back_; }
+    const std::vector<std::string> &history_forward() const { return forward_; }
     bool typing() const;
     bool show_hidden() const { return hidden_; }
     SortMode sort() const { return sort_; }

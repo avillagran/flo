@@ -387,25 +387,33 @@ void FileView::draw_row_item(int i, int X, int Y, int W, int H, const ItemState 
                        e.is_dir ? t.blue() : t.dim());
     } else {
         draw_badge(e, path, X + 6, Y + 3, 32, fill);
+        // Files: a yellow star over the icon's corner marks a starred item.
+        if (App::get().starred().contains(path))
+            fo::icon::draw("star", X + 28, Y + 3, 10, t.yellow());
         if (e.is_link)
             fo::text::draw("\xE2\x86\x92", X + 26, Y + 20, 14, 14, t.bright_foreground(), fo::text::REGULAR, 11,
                            FL_ALIGN_CENTER, fo::text::Elide::None);
     }
     int fs = dual ? 12 : 13;
     std::string name = display_name(e);
+    // Files: a starred item that is gone stays listed, dimmed.
+    const bool gone = e.mode == 0 && !e.name.empty() && e.name[0] == '/';
+    if (gone)
+        name = fo::i18n::arg(fo::tr("%1 \xC2\xB7 unavailable"), name);
     if (show_folders_ && e.name.find('/') != std::string::npos) {
-        std::string where = e.name.substr(0, e.name.rfind('/'));
+        std::string where = tilde(e.name.substr(0, std::max<size_t>(1, e.name.rfind('/'))));
         int nw = std::min(c.name_w, int(fo::text::width(name, fo::text::REGULAR, fs)) + 1);
-        fo::text::draw(name, X + c.name_x, Y, nw, H, t.bright_foreground(), fo::text::REGULAR, fs, FL_ALIGN_LEFT,
+        fo::text::draw(name, X + c.name_x, Y, nw, H, gone ? t.dim() : t.bright_foreground(), fo::text::REGULAR, fs,
+                       FL_ALIGN_LEFT,
                        fo::text::Elide::Middle);
         if (nw + 16 < c.name_w)
             fo::text::draw(where, X + c.name_x + nw + 12, Y, c.name_w - nw - 12, H, t.dim(), fo::text::REGULAR, 11,
                            FL_ALIGN_LEFT, fo::text::Elide::Middle);
     } else {
-        fo::text::draw(name, X + c.name_x, Y, c.name_w, H, t.bright_foreground(), fo::text::REGULAR, fs,
+        fo::text::draw(name, X + c.name_x, Y, c.name_w, H, gone ? t.dim() : t.bright_foreground(), fo::text::REGULAR, fs,
                        FL_ALIGN_LEFT, fo::text::Elide::Middle);
     }
-    if (c.size_w) {
+    if (c.size_w && !gone) {
         if (e.is_dir) {
             if (const FolderSizes::Result *r = App::get().sizes().get(path))
                 fo::text::draw("\xE2\x88\x91 " + si_size(r->bytes), X + c.size_x, Y, c.size_w, H, t.accent(),

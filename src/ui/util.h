@@ -35,6 +35,10 @@ struct FolderModel {
 };
 
 constexpr const char *kRecents = "recent://";
+// Files' Starred list (Ctrl+Alt+E): the starred items, wherever they are.
+constexpr const char *kStarred = "starred://";
+// Recents and Starred are lists, not folders.
+inline bool is_virtual_folder(const std::string &f) { return f == kRecents || f == kStarred; }
 
 // The last path component of an entry's name (search results and Recents
 // carry longer names).

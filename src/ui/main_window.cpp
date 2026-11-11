@@ -7,6 +7,7 @@
 #include "ui/app.h"
 #include "ui/commands.h"
 #include "ui/details.h"
+#include "ui/favorites.h"
 #include "ui/file_view.h"
 #include "ui/pane.h"
 
@@ -653,7 +654,7 @@ void MainWindow::update_status() {
     status_->left(p->status_text());
     static int tip = 0;
     status_->hint(fo::tr(kTips[size_t(tip) % (sizeof kTips / sizeof kTips[0])]));
-    status_->right(fs_summary(p->folder() == kRecents ? xdg::home() : p->folder()));
+    status_->right(fs_summary(is_virtual_folder(p->folder()) ? xdg::home() : p->folder()));
 }
 
 void MainWindow::pss_tick(void *data) {
@@ -810,6 +811,10 @@ std::vector<fo::MenuItem> MainWindow::actions_items() {
             .disabled(!has),
         MenuItem(fo::tr("Pin this folder"), "Ctrl+D", [P] { P()->toggle_pin(); }).with_icon("pin"),
         MenuItem(fo::tr("Recents"), "Ctrl+Alt+R", [P] { P()->navigate(kRecents); }).with_icon("recent"),
+        MenuItem(fo::tr("Star / unstar"), "Ctrl+E", [P] { P()->toggle_star(); }).with_icon("star"),
+        MenuItem(fo::tr("Starred"), "Ctrl+Alt+E", [P] { P()->navigate(kStarred); }).with_icon("star-outline"),
+        MenuItem(fo::tr("Favorites and places"), "Ctrl+Alt+D", [this] { FavoritesHub::open(this, active_pane()); })
+            .with_icon("star"),
     };
     std::vector<MenuItem> sizes = {
         MenuItem(fo::tr("Calculate size"), "Ctrl+Space", [P] { P()->measure_focused(); }).with_icon("calculator"),
@@ -932,8 +937,8 @@ void MainWindow::commands() { run_omnibar(">"); }
 // --- Rail ------------------------------------------------------------------------------
 
 std::string MainWindow::place_for(const std::string &folder) const {
-    if (folder == kRecents)
-        return kRecents;
+    if (is_virtual_folder(folder))
+        return folder;
     std::string best;
     for (const auto &r : rail_->rows()) {
         const std::string &id = r.id;
@@ -956,6 +961,7 @@ void MainWindow::rebuild_sidebar() {
     for (const auto &p : pd.views)
         if (p.icon == "recent")
             rail_->add_row({fo::tr(p.name.c_str()), "recent", p.path});
+    rail_->add_row({fo::tr("Starred"), "star-outline", kStarred});
     for (const auto &p : pd.pinned)
         rail_->add_row({p.name, "star", p.path});
     for (const auto &p : pd.remote)
@@ -1129,6 +1135,8 @@ void MainWindow::show_help() {
                   {"Ctrl+Space", fo::tr("Calculate the folder's size")},
                   {"Ctrl+H", fo::tr("Show hidden files")},
                   {"Ctrl+D", fo::tr("Pin the folder")},
+                  {"Ctrl+Alt+D", fo::tr("Favorites and places")},
+                  {"Ctrl+E / Ctrl+Alt+E", fo::tr("Star / open Starred")},
                   {"Ctrl+Alt+I", fo::tr("Inspector")},
                   {"F10 / Ctrl+,", fo::tr("Actions / Preferences")},
                   {"Ctrl+R", fo::tr("Reload")},
@@ -1162,7 +1170,10 @@ void MainWindow::build_shortcuts() {
     on("Ctrl+Shift+Tab", [this] { select_tab((tab_ + int(tabs_.size()) - 1) % int(tabs_.size())); });
     on("Ctrl+PageUp", [this] { select_tab((tab_ + int(tabs_.size()) - 1) % int(tabs_.size())); });
     on("Ctrl+Alt+S", [this] { focus_sidebar(); });
-    on("Ctrl+Alt+D", [this] { focus_sidebar(); });
+    // Files: the favorites hub (favorites, XDG places and history, labels).
+    on("Ctrl+Alt+D", [this] { FavoritesHub::open(this, active_pane()); });
+    on("Ctrl+E", [P] { P()->toggle_star(); });
+    on("Ctrl+Alt+E", [P] { P()->navigate(kStarred); });
     on("F9", [this] { toggle_dual(); });
     on("Ctrl+Shift+F", [this] { begin_search(); });
     on("Ctrl+F", [this] { begin_filter(); });
@@ -1240,7 +1251,7 @@ void MainWindow::build_shortcuts() {
     on("Ctrl+Shift+S", [P] { P()->sort_menu(); });
     on("Ctrl+Alt+R", [P] { P()->navigate(kRecents); });
     on("Ctrl+Alt+O", [P] {
-        if (P()->current() >= 0 && !P()->query().empty())
+        if (P()->current() >= 0 && (!P()->query().empty() || P()->in_recents()))
             P()->show_item(P()->current_path());
     });
     on("Escape", [this, P] {

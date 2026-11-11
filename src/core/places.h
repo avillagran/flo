@@ -55,6 +55,13 @@ bool is_pinned(const std::string &path, const std::string &file = bookmarks_path
 // kept as they were). Returns "" or a sentence saying why not.
 std::string pin(const std::string &path, const std::string &home, const std::string &file = bookmarks_path());
 bool unpin(const std::string &path, const std::string &file = bookmarks_path());
+// Files' favorite labels: sets the GTK label of a local bookmark ("" goes
+// back to the folder's name). The folder itself is never renamed. Returns
+// "" or a sentence saying why not (not a favorite, too long, a line break).
+std::string relabel(const std::string &path, const std::string &label, const std::string &file = bookmarks_path());
+// Files' default label for a new favorite: the folder's name, control
+// characters replaced, at most 96 bytes.
+std::string default_label(const std::string &path);
 
 // Drives from a mount table (Folio's physicalDrives): block devices that
 // aren't the system's own, the shortest mount point of each device.

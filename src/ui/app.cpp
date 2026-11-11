@@ -278,6 +278,14 @@ FolderViews &App::folder_views() {
     return folder_views_;
 }
 
+Starred &App::starred() {
+    if (!starred_loaded_) {
+        starred_loaded_ = true;
+        starred_.load();
+    }
+    return starred_;
+}
+
 void App::save_session(MainWindow *w, bool quiet) {
     if (!w)
         return;

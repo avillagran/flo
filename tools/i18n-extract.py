@@ -26,6 +26,11 @@ DYNAMIC = [
     # Saved folder views (core/folder_views.cpp), shown as they come.
     "Up to 256 folders keep a view; forget one first.", "Only local folders keep a view.",
     "The folder views file can't be changed.",
+    # The favorites hub's buttons and the core's favorites sentences.
+    "Enter", "Save", "Current", "Label", "Remove",
+    "This folder is not a favorite.", "Type a single line without control characters.",
+    "Only folders can be pinned.", "Up to 10000 starred items.",
+    "The starred list can't be read; it is kept unchanged.",
 ]
 
 call = re.compile(r'\b(?:fo::)?(trn?)\(\s*((?:"(?:[^"\\]|\\.)*"\s*)+)')

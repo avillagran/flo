@@ -59,9 +59,10 @@ the next phase), **Out** (left out of this phase on purpose).
 | Delete / F8 trash, Shift+Delete | Done (permanent deletion only inside the trash, after a prompt) |
 | Ctrl+C / X / V, Ctrl+Shift+V, Ctrl+Alt+C copy path | Done |
 | Ctrl+Space size of the focused folder, Ctrl+Shift+Space listed folders | Done (`FolderSizes`: no links followed, one filesystem, 256 results kept). The size manager (Ctrl+Alt+Space): Out |
-| Ctrl+H hidden, Ctrl+R reload, Menu / Shift+F10 context menu, Ctrl+Alt+I inspector, F9 dual, F10 Actions, Ctrl+, Preferences, Ctrl+D pin, Ctrl+Alt+S / Ctrl+Alt+D rail, Ctrl+. terminal, Ctrl+Alt+R Recents, Ctrl+Shift+O open with, F1 help | Done (Ctrl+Alt+D focuses the rail; Files' bookmarks panel with labels: Next) |
+| Ctrl+H hidden, Ctrl+R reload, Menu / Shift+F10 context menu, Ctrl+Alt+I inspector, F9 dual, F10 Actions, Ctrl+, Preferences, Ctrl+D pin, Ctrl+Alt+S rail, Ctrl+. terminal, Ctrl+Alt+R Recents, Ctrl+Shift+O open with, F1 help | Done (Ctrl+Alt+S focuses the rail) |
 | Alt+Enter properties | Partial: shows the inspector; Files' properties dialog with permissions: Next |
-| Ctrl+E star, Ctrl+Alt+E starred | Next |
+| Ctrl+Alt+D favorites and places | Done (`FavoritesHub`, after Files' `bookmarks_ui.rs`): favorites with their labels, the XDG places and the tab's Back / Forward history; typing filters by label, Enter opens, F2 edits the label (stored as the GTK bookmark label; the folder is never renamed; 1–96 bytes, one line), Delete removes a favorite (the folder stays), Ctrl+D adds the current folder, F5 reloads. Files' publish/ACK diagnostics (F1, F8) have no counterpart: Flo writes the bookmarks file directly |
+| Ctrl+E star, Ctrl+Alt+E starred | Done (`core/starred.h`, Files' format in `$XDG_DATA_HOME/flo/starred`, up to 10,000 items): Ctrl+E stars the marked items (or the focused one) or unstars them when all are starred; a yellow star marks them in the List and Groups rows; Starred (the rail, Ctrl+Alt+E) lists them newest first with their folder, keeps missing ones as "unavailable", and its menu offers only Open, Open containing folder, Remove from Starred (Delete; the file is not touched) and Star. Removing a Recents entry (Files' Delete there): Next |
 | Ctrl+Alt+B MC operation bar | Next |
 | Nautilus shortcut profile | Next |
 

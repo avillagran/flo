@@ -7,6 +7,7 @@
 #include "core/dbus_service.h"
 #include "core/event_queue.h"
 #include "core/folder_views.h"
+#include "core/starred.h"
 #include "core/lister.h"
 #include "core/network.h"
 #include "core/places.h"
@@ -79,6 +80,8 @@ public:
     Settings &settings() { return settings_; }
     // Files' saved folder views (read once, at the first use).
     FolderViews &folder_views();
+    // Files' starred items (Ctrl+E), read once at the first use.
+    Starred &starred();
     // Saves this window's tabs as the session ("Save session"); the
     // window then keeps it saved when it closes.
     void save_session(MainWindow *w, bool quiet = false);
@@ -125,6 +128,8 @@ private:
     Settings settings_;
     FolderViews folder_views_;
     bool folder_views_loaded_ = false;
+    Starred starred_;
+    bool starred_loaded_ = false;
     ListingCache listings_;
     PlacesData places_;
     PreviewClient preview_;

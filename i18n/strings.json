@@ -60,6 +60,10 @@
   "plural": false
  },
  {
+  "source": "%1 · unavailable",
+  "plural": false
+ },
+ {
   "source": "%n commands",
   "plural": true
  },
@@ -68,7 +72,19 @@
   "plural": true
  },
  {
+  "source": "%n favorites",
+  "plural": true
+ },
+ {
   "source": "%n items",
+  "plural": true
+ },
+ {
+  "source": "%n items removed from starred",
+  "plural": true
+ },
+ {
+  "source": "%n items starred",
   "plural": true
  },
  {
@@ -82,6 +98,10 @@
  {
   "source": "%n thumbnails",
   "plural": true
+ },
+ {
+  "source": "A label holds 1 to 96 bytes.",
+  "plural": false
  },
  {
   "source": "A name can't be empty, contain / or be . or ..",
@@ -308,6 +328,10 @@
   "plural": false
  },
  {
+  "source": "Current",
+  "plural": false
+ },
+ {
   "source": "Cut",
   "plural": false
  },
@@ -444,6 +468,10 @@
   "plural": false
  },
  {
+  "source": "Enter",
+  "plural": false
+ },
+ {
   "source": "Enter / double click",
   "plural": false
  },
@@ -468,7 +496,39 @@
   "plural": false
  },
  {
+  "source": "F2 label · Delete removes",
+  "plural": false
+ },
+ {
+  "source": "Favorite added",
+  "plural": false
+ },
+ {
+  "source": "Favorite label · does not rename the folder",
+  "plural": false
+ },
+ {
+  "source": "Favorite removed; the folder is untouched",
+  "plural": false
+ },
+ {
+  "source": "Favorites and places",
+  "plural": false
+ },
+ {
+  "source": "Favorites loaded",
+  "plural": false
+ },
+ {
   "source": "File",
+  "plural": false
+ },
+ {
+  "source": "Filter by label",
+  "plural": false
+ },
+ {
+  "source": "Filter by label · favorites / XDG / history",
   "plural": false
  },
  {
@@ -576,7 +636,15 @@
   "plural": false
  },
  {
+  "source": "Label",
+  "plural": false
+ },
+ {
   "source": "label in list",
+  "plural": false
+ },
+ {
+  "source": "Label updated",
   "plural": false
  },
  {
@@ -712,7 +780,15 @@
   "plural": false
  },
  {
+  "source": "No recent files",
+  "plural": false
+ },
+ {
   "source": "No selection",
+  "plural": false
+ },
+ {
+  "source": "No starred items · Ctrl+E stars the focused item in any folder",
   "plural": false
  },
  {
@@ -744,6 +820,10 @@
   "plural": false
  },
  {
+  "source": "Only folders can be pinned.",
+  "plural": false
+ },
+ {
   "source": "Only local folders keep a view.",
   "plural": false
  },
@@ -753,6 +833,10 @@
  },
  {
   "source": "Open (⏎)",
+  "plural": false
+ },
+ {
+  "source": "Open containing folder",
   "plural": false
  },
  {
@@ -868,6 +952,26 @@
   "plural": false
  },
  {
+  "source": "Remove",
+  "plural": false
+ },
+ {
+  "source": "Remove from starred",
+  "plural": false
+ },
+ {
+  "source": "Remove from Starred (the file is not deleted)",
+  "plural": false
+ },
+ {
+  "source": "Removed from starred",
+  "plural": false
+ },
+ {
+  "source": "Removed from Starred: %1 · the file was not touched",
+  "plural": false
+ },
+ {
   "source": "Rename",
   "plural": false
  },
@@ -905,6 +1009,10 @@
  },
  {
   "source": "Restoring",
+  "plural": false
+ },
+ {
+  "source": "Save",
   "plural": false
  },
  {
@@ -1072,6 +1180,30 @@
   "plural": false
  },
  {
+  "source": "Star",
+  "plural": false
+ },
+ {
+  "source": "Star / open Starred",
+  "plural": false
+ },
+ {
+  "source": "Star / unstar",
+  "plural": false
+ },
+ {
+  "source": "Star: select a file or folder",
+  "plural": false
+ },
+ {
+  "source": "Starred",
+  "plural": false
+ },
+ {
+  "source": "Starred · Ctrl+Alt+E opens Starred",
+  "plural": false
+ },
+ {
   "source": "Still connecting to another machine",
   "plural": false
  },
@@ -1136,6 +1268,10 @@
   "plural": false
  },
  {
+  "source": "The folder is already a favorite",
+  "plural": false
+ },
+ {
   "source": "The folder views can't be saved.",
   "plural": false
  },
@@ -1145,6 +1281,14 @@
  },
  {
   "source": "The session can't be saved.",
+  "plural": false
+ },
+ {
+  "source": "The starred list can't be read; it is kept unchanged.",
+  "plural": false
+ },
+ {
+  "source": "The starred list can't be saved.",
   "plural": false
  },
  {
@@ -1165,6 +1309,10 @@
  },
  {
   "source": "This folder has no saved view",
+  "plural": false
+ },
+ {
+  "source": "This folder is not a favorite.",
   "plural": false
  },
  {
@@ -1197,6 +1345,10 @@
  },
  {
   "source": "Type",
+  "plural": false
+ },
+ {
+  "source": "Type a single line without control characters.",
   "plural": false
  },
  {
@@ -1233,6 +1385,10 @@
  },
  {
   "source": "Up to %1 tabs",
+  "plural": false
+ },
+ {
+  "source": "Up to 10000 starred items.",
   "plural": false
  },
  {

@@ -202,6 +202,51 @@ bool unpin(const std::string &path, const std::string &file) {
     return lines.size() != before && write_lines(file, lines);
 }
 
+std::string relabel(const std::string &path, const std::string &label, const std::string &file) {
+    if (label.size() > 96)
+        return "A label holds 1 to 96 bytes.";
+    for (unsigned char c : label)
+        if (c < 0x20 || c == 0x7f)
+            return "Type a single line without control characters.";
+    const std::string clean = clean_path(absolute_path(path));
+    auto lines = raw_lines(file);
+    bool found = false;
+    for (auto &l : lines) {
+        const std::string uri = l.substr(0, l.find(' '));
+        const std::string p = uri_to_path(uri);
+        if (p.empty() || clean_path(p) != clean)
+            continue;
+        std::string t = label;
+        while (!t.empty() && t.back() == ' ')
+            t.pop_back();
+        while (!t.empty() && t.front() == ' ')
+            t.erase(t.begin());
+        l = t.empty() ? uri : uri + " " + t;
+        found = true;
+    }
+    if (!found)
+        return "This folder is not a favorite.";
+    if (!write_lines(file, lines))
+        return "Couldn't save the favorites to " + file + ".";
+    return {};
+}
+
+std::string default_label(const std::string &path) {
+    std::string name = display_name(path_basename(clean_path(path)));
+    for (auto &c : name)
+        if (static_cast<unsigned char>(c) < 0x20 || c == 0x7f)
+            c = '?';
+    if (name.empty())
+        name = "Folder";
+    if (name.size() > 96) {
+        size_t cut = 93;
+        while (cut > 0 && (static_cast<unsigned char>(name[cut]) & 0xC0) == 0x80)
+            --cut;
+        name = name.substr(0, cut) + "\xE2\x80\xA6";
+    }
+    return name;
+}
+
 std::vector<Place> physical_drives(const std::vector<MountInfo> &mounts_in, const std::string &system_device,
                                    const std::vector<std::pair<std::string, std::string>> &labels) {
     // Where the system itself lives; a drive mounted here is the computer.
