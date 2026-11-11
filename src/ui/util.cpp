@@ -146,45 +146,6 @@ std::string expand_typed(const std::string &text, const std::string &cwd) {
     return clean_path(path_join(cwd, t));
 }
 
-std::string complete_path(const std::string &text, const std::string &cwd, bool show_hidden) {
-    // Split into the folder part (kept as typed) and the partial name.
-    auto slash = text.rfind('/');
-    std::string typed_dir = slash == std::string::npos ? std::string() : text.substr(0, slash + 1);
-    std::string partial = slash == std::string::npos ? text : text.substr(slash + 1);
-    if (text == "~")
-        return "~/";
-    std::string dir = typed_dir.empty() ? cwd : expand_typed(typed_dir, cwd);
-    if (dir.empty())
-        dir = "/";
-    DIR *d = opendir(dir.c_str());
-    if (!d)
-        return text;
-    std::vector<std::string> matches;
-    while (dirent *de = readdir(d)) {
-        std::string n = de->d_name;
-        if (n == "." || n == "..")
-            continue;
-        if (n[0] == '.' && !show_hidden && (partial.empty() || partial[0] != '.'))
-            continue;
-        if (n.compare(0, partial.size(), partial) != 0)
-            continue;
-        if (!is_dir(path_join(dir, n)))
-            continue;
-        matches.push_back(n);
-    }
-    closedir(d);
-    if (matches.empty())
-        return text;
-    std::string common = matches[0];
-    for (const auto &m : matches) {
-        size_t k = 0;
-        while (k < common.size() && k < m.size() && common[k] == m[k])
-            ++k;
-        common.resize(k);
-    }
-    return typed_dir + common + (matches.size() == 1 ? "/" : "");
-}
-
 std::string type_description(const std::string &mime) {
     static std::map<std::string, std::string> cache;
     if (mime.empty())

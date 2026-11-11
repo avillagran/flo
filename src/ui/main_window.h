@@ -6,12 +6,14 @@
 // rail and the inspector follow the pane used last.
 #pragma once
 
+#include "core/path_completion.h"
 #include "core/places.h"
 #include "core/session.h"
 
 #include "fltk-omarchy/anim.h"
 #include "fltk-omarchy/window.h"
 
+#include <optional>
 #include <string>
 #include <vector>
 
@@ -55,8 +57,13 @@ public:
     // Tabs (Ctrl+T, Ctrl+W, Ctrl+Shift+T, Ctrl+Tab).
     void new_tab(const std::string &folder, bool background = false);
     void close_tab(int i);
+    // Files' tab menu: "Close other tabs" and "Close tabs to the right".
+    void close_other_tabs(int i);
+    void close_tabs_right(int i);
     void reopen_tab();
     void select_tab(int i);
+    // Files: moves tab `from` to position `to` (Ctrl+Shift+PgUp/PgDn, drag).
+    void move_tab(int from, int to);
 
     // The session: this window's tabs (not the dual pane), and showing a
     // saved one. The owner window saves it again when it closes.
@@ -113,6 +120,17 @@ public:
 
 private:
     void build_header();
+    // Files' free header (window_chrome.rs): the 58 px header outside its
+    // controls (back/forward/up, the address card, the OK/x buttons and each
+    // toolbar button) moves the window.
+    bool free_header(int x, int y) const;
+    // Files' location field: Tab completes the last component and walks the
+    // candidates (Shift+Tab, Up/Down), Enter accepts one, Esc closes them.
+    bool path_key(int key);
+    void complete_field(bool backwards);
+    void close_path_completion();
+    void set_field_text(const std::string &text);
+    void show_completion(const std::string &notice);
     void build_shortcuts();
     void update_header();
     void update_tabs();
@@ -128,6 +146,8 @@ private:
 
     fo::ToolBar *nav_ = nullptr, *tools_ = nullptr;
     fo::Breadcrumbs *crumbs_ = nullptr;
+    int address_x_ = 124, address_w_ = 0; // Files' address card (y 10..48)
+    std::optional<PathCompletion> completion_;
     fo::TextField *field_ = nullptr;
     fo::IconButton *field_ok_ = nullptr, *field_cancel_ = nullptr;
     fo::TabStrip *tab_strip_ = nullptr;

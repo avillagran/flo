@@ -1,6 +1,7 @@
 #include "ui/main_window.h"
 
 #include "core/fsutil.h"
+#include "core/path_completion.h"
 #include "core/settings.h"
 #include "core/tree_size.h"
 #include "core/xdg.h"
@@ -124,6 +125,7 @@ MainWindow::MainWindow(int W, int H, const std::string &folder, const std::strin
     const Settings &s = App::get().settings();
     details_on_ = s.details_pane;
     build_header();
+    move_area([this](int x, int y) { return free_header(x, y); });
     tab_strip_ = new fo::TabStrip(0, kHeader, W, kTabs);
     rail_ = new fo::Sidebar(0, kTop, kRail, H - kTop - kStatus);
     rail_->rail(true, kRail, kRailWide);
@@ -142,10 +144,23 @@ MainWindow::MainWindow(int W, int H, const std::string &folder, const std::strin
     tab_strip_->on_select([this](int i) { select_tab(i); });
     tab_strip_->on_close([this](int i) { defer([this, i] { close_tab(i); }); });
     tab_strip_->on_new([this] { new_tab(active_pane()->folder()); });
+    tab_strip_->on_reorder([this](int from, int to) { move_tab(from, to); });
     tab_strip_->on_context([this](int i, int x, int y) {
+        // Files' tab menu (tab_context.rs), then Flo's New / Reopen.
+        const int n = int(tabs_.size());
         std::vector<fo::MenuItem> m;
-        m.push_back(fo::MenuItem(fo::tr("New tab"), "Ctrl+T", [this] { new_tab(active_pane()->folder()); }));
         m.push_back(fo::MenuItem(fo::tr("Close tab"), "Ctrl+W", [this, i] { defer([this, i] { close_tab(i); }); }));
+        m.push_back(fo::MenuItem(fo::tr("Close other tabs"), "", [this, i] { defer([this, i] { close_other_tabs(i); }); })
+                        .disabled(n <= 1));
+        m.push_back(fo::MenuItem(fo::tr("Close tabs to the right"), "",
+                                 [this, i] { defer([this, i] { close_tabs_right(i); }); })
+                        .disabled(i + 1 >= n));
+        m.push_back(fo::MenuItem(fo::tr("Move left"), "Ctrl+Shift+PgUp", [this, i] { move_tab(i, i - 1); })
+                        .disabled(i <= 0));
+        m.push_back(fo::MenuItem(fo::tr("Move right"), "Ctrl+Shift+PgDn", [this, i] { move_tab(i, i + 1); })
+                        .disabled(i + 1 >= n));
+        m.push_back(fo::MenuItem::separator());
+        m.push_back(fo::MenuItem(fo::tr("New tab"), "Ctrl+T", [this] { new_tab(active_pane()->folder()); }));
         m.push_back(fo::MenuItem(fo::tr("Reopen closed tab"), "Ctrl+Shift+T", [this] { reopen_tab(); })
                         .disabled(closed_tabs_.empty()));
         fo::PopupMenu::open_at(this, x, y, m);
@@ -255,20 +270,42 @@ void MainWindow::build_header() {
             active_pane()->focus_view(); // Files: Enter returns to the list
         }
     });
+    // Files' line editing: components between "/" for Ctrl+arrows,
+    // Ctrl+Backspace/Delete and double clicks.
+    field_->separators("/");
     field_->on_key([this](int k) {
+        if (field_mode_ == Field::Path)
+            return path_key(k);
         if ((k == FL_Down || k == FL_Tab) && field_mode_ != Field::Path) {
             active_pane()->focus_view();
             return true;
         }
         return false;
     });
-    field_->on_complete([this](const std::string &t) {
-        if (field_mode_ != Field::Path)
-            return t;
-        return complete_path(t, active_pane()->folder(), active_pane()->show_hidden());
-    });
     field_ok_->on_click([this] { run_omnibar(field_->value()); });
     field_cancel_->on_click([this] { end_field(); });
+}
+
+bool MainWindow::free_header(int x, int y) const {
+    if (x < 0 || y < 0 || x >= w() || y >= kHeader)
+        return false;
+    auto inside = [x, y](int rx, int ry, int rw, int rh) { return x >= rx && x < rx + rw && y >= ry && y < ry + rh; };
+    if (inside(address_x_, 10, address_w_, 38))
+        return false;
+    for (const Fl_Widget *wd : {static_cast<const Fl_Widget *>(field_), static_cast<const Fl_Widget *>(crumbs_),
+                                static_cast<const Fl_Widget *>(field_ok_), static_cast<const Fl_Widget *>(field_cancel_)})
+        if (wd->visible() && inside(wd->x(), wd->y(), wd->w(), wd->h()))
+            return false;
+    for (fo::ToolBar *bar : {nav_, tools_}) {
+        if (!bar->visible())
+            continue;
+        for (int i = 0; i < int(bar->items().size()); ++i) {
+            int bx, by, bw, bh;
+            if (bar->item_rect(i, bx, by, bw, bh) && inside(bx, by, bw, bh))
+                return false;
+        }
+    }
+    return true;
 }
 
 // --- Panes and tabs ----------------------------------------------------------------
@@ -339,6 +376,18 @@ void MainWindow::select_tab(int i) {
     tabs_[size_t(tab_)]->focus_view();
 }
 
+void MainWindow::move_tab(int from, int to) {
+    const int n = int(tabs_.size());
+    if (from < 0 || from >= n || to < 0 || to >= n || from == to)
+        return;
+    Pane *active = tabs_[size_t(tab_)];
+    Pane *moved = tabs_[size_t(from)];
+    tabs_.erase(tabs_.begin() + from);
+    tabs_.insert(tabs_.begin() + to, moved);
+    tab_ = int(std::find(tabs_.begin(), tabs_.end(), active) - tabs_.begin());
+    update_tabs();
+}
+
 void MainWindow::close_tab(int i) {
     if (i < 0 || i >= int(tabs_.size()))
         return;
@@ -358,6 +407,19 @@ void MainWindow::close_tab(int i) {
     if (tab_ >= int(tabs_.size()) || i < tab_)
         tab_ = std::max(0, tab_ - 1);
     select_tab(tab_);
+}
+
+void MainWindow::close_tabs_right(int i) {
+    while (i >= 0 && i + 1 < int(tabs_.size()))
+        close_tab(int(tabs_.size()) - 1);
+}
+
+void MainWindow::close_other_tabs(int i) {
+    if (i < 0 || i >= int(tabs_.size()))
+        return;
+    close_tabs_right(i);
+    for (int k = 0; k < i; ++k)
+        close_tab(0);
 }
 
 void MainWindow::reopen_tab() {
@@ -507,6 +569,7 @@ void MainWindow::layout() {
         tools_->hide();
         crumbs_->hide();
         field_->resize(124, 10, std::max(1, W - 228), 38);
+        address_w_ = field_->w();
         field_->show();
         field_ok_->resize(W - 84, 10, 36, 36);
         field_cancel_->resize(W - 44, 10, 36, 36);
@@ -520,6 +583,7 @@ void MainWindow::layout() {
         int pw = tools_->preferred_width();
         tools_->resize(W - 12 - pw, 10, pw, 36);
         int omni_w = std::max(1, W - 12 - pw - 14 - 132);
+        address_w_ = omni_w;
         if (field_mode_ == Field::Filter || field_mode_ == Field::Search) {
             crumbs_->hide();
             field_->resize(124, 10, omni_w, 38);
@@ -767,6 +831,104 @@ void MainWindow::edit_path() {
     field_->take_focus();
 }
 
+// --- Files' Tab completion in the location field (path_edit.rs) -------------------
+
+bool MainWindow::path_key(int k) {
+    const int st = Fl::event_state();
+    const bool ctrl = st & FL_CTRL, shift = st & FL_SHIFT, alt = st & FL_ALT;
+    const bool suggesting = completion_ && !completion_->items.empty();
+    if (k == FL_Tab && !ctrl && !alt) {
+        complete_field(shift);
+        return true;
+    }
+    if ((k == FL_Up || k == FL_Down) && suggesting) {
+        complete_field(k == FL_Up);
+        return true;
+    }
+    if (k == FL_Escape && completion_) {
+        close_path_completion();
+        return true;
+    }
+    if ((k == FL_Enter || k == FL_KP_Enter) && completion_ && completion_->index >= 0) {
+        // Accept the highlighted candidate; a second Enter goes there.
+        close_path_completion();
+        return true;
+    }
+    switch (k) {
+    case FL_Up: case FL_Down: case FL_Page_Up: case FL_Page_Down:
+    case FL_Shift_L: case FL_Shift_R: case FL_Control_L: case FL_Control_R:
+    case FL_Alt_L: case FL_Alt_R: case FL_Meta_L: case FL_Meta_R: case FL_Caps_Lock:
+        break; // Files: these keep the candidates
+    default:
+        close_path_completion();
+    }
+    return false;
+}
+
+void MainWindow::set_field_text(const std::string &text) {
+    // An edit, not value(): Ctrl+Z takes a completion back.
+    if (text != field_->value())
+        field_->replace(0, field_->size(), text.data(), int(text.size()));
+    field_->insert_position(field_->size());
+}
+
+void MainWindow::show_completion(const std::string &notice) { status_->left(notice); }
+
+void MainWindow::close_path_completion() {
+    if (!completion_)
+        return;
+    completion_.reset();
+    update_status();
+}
+
+void MainWindow::complete_field(bool backwards) {
+    if (completion_ && completion_->items.size() > 1) {
+        const int n = int(completion_->items.size()), i = completion_->index;
+        completion_->index = i < 0 ? (backwards ? n - 1 : 0) : backwards ? (i + n - 1) % n : (i + 1) % n;
+        set_field_text(completion_->text(completion_->index));
+        show_completion(completion_->render());
+        return;
+    }
+    close_path_completion();
+    const std::string text = field_->value();
+    if (text.empty() || text.find("://") != std::string::npos || text[0] == '>' || text[0] == ':' ||
+        std::any_of(text.begin(), text.end(), [](char c) { return static_cast<unsigned char>(c) < 0x20; }))
+        return;
+    if (text == "~") {
+        set_field_text("~/");
+        return;
+    }
+    std::string base, partial;
+    split_component(text, base, partial);
+    const std::string cwd = active_pane()->folder();
+    std::string dir = base.empty() ? cwd : expand_typed(base, cwd);
+    if (dir.empty() || is_virtual_folder(dir))
+        return;
+    if (network_location(dir)) {
+        completion_ = PathCompletion{};
+        show_completion(fo::tr("Tab: no completion in network locations"));
+        return;
+    }
+    std::vector<PathCandidate> found = completion_matches(read_candidates(dir, partial), partial);
+    if (found.empty()) {
+        completion_ = PathCompletion{};
+        show_completion(fo::tr("Tab: no matches"));
+        return;
+    }
+    if (found.size() == 1) {
+        set_field_text(base + found[0].name + (found[0].dir ? "/" : ""));
+        return;
+    }
+    bool insensitive = std::any_of(found.begin(), found.end(), [&](const PathCandidate &c) {
+        return c.name.compare(0, partial.size(), partial) != 0;
+    });
+    std::string prefix = common_prefix(found, insensitive);
+    if (prefix.size() >= partial.size() && prefix != partial)
+        set_field_text(base + prefix);
+    completion_ = PathCompletion{base, std::move(found), -1};
+    show_completion(completion_->render());
+}
+
 void MainWindow::begin_filter(const std::string &text) {
     Pane *p = active_pane();
     if (p->in_recents() && text.empty())
@@ -791,6 +953,7 @@ void MainWindow::begin_search() {
 }
 
 void MainWindow::end_field(bool refocus) {
+    close_path_completion();
     if (field_mode_ == Field::None)
         return;
     bool keep = field_mode_ == Field::Filter && !active_pane()->filter().empty();
@@ -1225,6 +1388,7 @@ void MainWindow::show_help() {
                   {"Ctrl+Alt+I", fo::tr("Inspector")},
                   {"Alt+Enter", fo::tr("Properties and permissions")},
                   {"Ctrl+Alt+B", fo::tr("MC operation bar")},
+                  {"Ctrl+Shift+PgUp / PgDn", fo::tr("Move the active tab left/right")},
                   {"F10 / Ctrl+,", fo::tr("Actions / Preferences")},
                   {"Ctrl+R", fo::tr("Reload")},
                   {"Menu / Shift+F10", fo::tr("Context menu")},
@@ -1254,6 +1418,8 @@ void MainWindow::build_shortcuts() {
     on("Ctrl+Shift+T", [this] { reopen_tab(); });
     on("Ctrl+Tab", [this] { select_tab((tab_ + 1) % int(tabs_.size())); });
     on("Ctrl+PageDown", [this] { select_tab((tab_ + 1) % int(tabs_.size())); });
+    on("Ctrl+Shift+PageUp", [this] { move_tab(tab_, tab_ - 1); });
+    on("Ctrl+Shift+PageDown", [this] { move_tab(tab_, tab_ + 1); });
     on("Ctrl+Shift+Tab", [this] { select_tab((tab_ + int(tabs_.size()) - 1) % int(tabs_.size())); });
     on("Ctrl+PageUp", [this] { select_tab((tab_ + int(tabs_.size()) - 1) % int(tabs_.size())); });
     on("Ctrl+Alt+S", [this] { focus_sidebar(); });

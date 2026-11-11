@@ -56,9 +56,6 @@ std::string place_icon(const std::string &icon);
 std::string tilde(const std::string &path);
 // Folio's typed paths: "~", "~/x", absolute, or relative to `cwd`.
 std::string expand_typed(const std::string &text, const std::string &cwd);
-// Tab completion of the last component to a folder name (the longest
-// common prefix when several match; a trailing '/' once unique).
-std::string complete_path(const std::string &text, const std::string &cwd, bool show_hidden);
 // The system's name for a MIME type ("JPEG image").
 std::string type_description(const std::string &mime);
 // Whether a path is inside a trash's files/ folder (or is one).

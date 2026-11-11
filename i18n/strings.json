@@ -284,7 +284,15 @@
   "plural": false
  },
  {
+  "source": "Close other tabs",
+  "plural": false
+ },
+ {
   "source": "Close tab",
+  "plural": false
+ },
+ {
+  "source": "Close tabs to the right",
   "plural": false
  },
  {
@@ -857,6 +865,18 @@
  },
  {
   "source": "Move %1 to:",
+  "plural": false
+ },
+ {
+  "source": "Move left",
+  "plural": false
+ },
+ {
+  "source": "Move right",
+  "plural": false
+ },
+ {
+  "source": "Move the active tab left/right",
   "plural": false
  },
  {
@@ -1529,6 +1549,14 @@
  },
  {
   "source": "Tab switches pane",
+  "plural": false
+ },
+ {
+  "source": "Tab: no completion in network locations",
+  "plural": false
+ },
+ {
+  "source": "Tab: no matches",
   "plural": false
  },
  {
