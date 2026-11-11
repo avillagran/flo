@@ -291,5 +291,12 @@
  "↑↓ or wheel · Enter runs · Esc closes": "↑↓ o rueda · Enter ejecuta · Esc cierra",
  "%1 visible": "%1 visibles",
  "%1 loaded": "%1 cargados",
- "Tab switches pane": "Tab cambia panel"
+ "Tab switches pane": "Tab cambia panel",
+ "%n thumbnails": {"one": "%n miniatura", "many": "%n miniaturas", "other": "%n miniaturas"},
+ "Reset Grid zoom": "Restablecer zoom de la Grilla",
+ "thumbnails off": "miniaturas desactivadas",
+ "Zoom in Grid": "Acercar Grilla",
+ "Zoom only exists in the Grid view (Ctrl+5)": "El zoom sólo existe en la vista Grilla (Ctrl+5)",
+ "Zoom out Grid": "Alejar Grilla",
+ "Zoom the Grid in / out / reset": "Acercar / alejar / restablecer la Grilla"
 }

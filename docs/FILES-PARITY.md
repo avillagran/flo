@@ -31,7 +31,7 @@ the next phase), **Out** (left out of this phase on purpose).
 | Status bar: marked and listed counts, a tip, filesystem and free space, live PSS | Done (`fo::StatusBar`); the tip is static (Files scrolls its tips) |
 | Groups view: folder cards under "FOLDERS · n" with a new-folder button, files as rows under TODAY / THIS WEEK / EARLIER / UNDATED | Done (`Collection::Layout::Bands`) |
 | List view: 38 px rows, thumbnails or extension badges, size / date / type columns, sortable header | Done; sorting by name, size, date (newest/oldest) and type. Descending name order: Next |
-| Grid view: 156 x 132 cells with thumbnails | Done. Grid zoom (Ctrl++ / Ctrl+- / Ctrl+0) and the "Grid · n · thumbnails" header: Next |
+| Grid view: 156 x 132 cells with thumbnails; zoom 65–180 % (Ctrl++ / Ctrl+= / Ctrl+- / Ctrl+0, Ctrl+wheel, the − / + buttons) and the 36 px "Grid · n · thumbnails" header with the percentage | Done (cells, icons and the header follow Files' `grid_view.rs`; outside the Grid the keys say "Zoom only exists in the Grid view (Ctrl+5)") |
 | Columns view: Finder-style columns, ← → change column, Shift+wheel scrolls, item counts | Done |
 | Space view: treemap by apparent size, tooltips, arrows move spatially, Enter zooms into a folder, Backspace back | Done (`SpaceView`). Files' Space toolbar (Back, Recalculate, Show hidden, Marks) and its list of items without area: Next |
 | Dual pane (F9): two list panes with their own header, footer and filter; Tab switches; F5/F6 target the other pane | Done |

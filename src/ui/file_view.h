@@ -44,6 +44,12 @@ public:
     void empty_text(const std::string &t) { empty_ = t; redraw(); }
     // Search results show where they are.
     void show_folders(bool on) { show_folders_ = on; }
+    // Files' Grid zoom: cells of 156 x 132 and icons of 36 px times `z`.
+    void zoom(double z);
+    double zoom() const { return zoom_; }
+    // Ctrl+wheel over the Grid: the factor to zoom by (1.1 or 1/1.1).
+    void on_zoom(std::function<void(double)> fn) { zoom_cb_ = std::move(fn); }
+    int handle(int event) override;
 
     int count() const override { return model_ ? model_->count() : 0; }
     std::string item_text(int i) const override;
@@ -69,7 +75,9 @@ private:
     bool show_folders_ = false;
     int ends_[5] = {0, 0, 0, 0, 0};
     int new_folder_x_ = 0, new_folder_y_ = 0;
+    double zoom_ = 1.0;
     std::function<void()> new_folder_;
+    std::function<void(double)> zoom_cb_;
 };
 
 // Files' "now", "2 min ago", "3 h ago", "yesterday", "4 d ago".

@@ -103,6 +103,14 @@ public:
     void redo();
     void toggle_hidden();
     void set_sort(SortMode m);
+    // Files' Grid zoom (Ctrl++ / Ctrl+- / Ctrl+0, Ctrl+wheel): cells and
+    // icons scale by `grid_zoom` in [0.65, 1.8], 1.15 per step.
+    static constexpr double kZoomMin = 0.65, kZoomMax = 1.8, kZoomStep = 1.15;
+    double grid_zoom() const { return grid_zoom_; }
+    void set_grid_zoom(double z);
+    void zoom_by(double factor);
+    // +1 in, -1 out, 0 reset; outside the Grid it says where zoom exists.
+    void zoom_step(int step);
     void sort_menu();
     // Files' selection tools.
     void invert_selection();
@@ -186,6 +194,10 @@ private:
     std::vector<fo::SortHeader::Column> list_header_columns() const;
     int banner_height() const;
     int header_height() const;
+    // The Grid header (36 px): caption, zoom percentage, − and +.
+    bool grid_header() const { return view_ == View::Grid && !dual_; }
+    void zoom_rects(int &minus_x, int &plus_x, int &y) const;
+    int grid_header_y_ = 0;
     std::string banner_text(bool &error, bool &progress) const;
     void wire(FileView *v);
     std::vector<fo::MenuItem> menu_for(int index, FolderModel *where, const std::string &folder);
@@ -211,6 +223,7 @@ private:
     std::string filter_;
     std::vector<Entry> all_; // the whole listing while a filter shows part of it
     SortMode sort_ = SortMode::Name;
+    double grid_zoom_ = 1.0;
     std::vector<std::string> back_, forward_;
     std::vector<std::pair<std::string, std::string>> crumbs_; // label, path
     std::string pending_select_;

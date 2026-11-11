@@ -4,6 +4,7 @@
  "%n items": {"one": "%n item", "other": "%n items"},
  "%n items will be deleted permanently. This can't be undone.": {"one": "%n item will be deleted permanently. This can't be undone.", "other": "%n items will be deleted permanently. This can't be undone."},
  "%n marked": {"one": "%n marked", "other": "%n marked"},
+ "%n thumbnails": {"one": "%n thumbnail", "other": "%n thumbnails"},
  "Copied %n items": {"one": "Copied %n item", "other": "Copied %n items"},
  "Copied %n paths": {"one": "Copied %n path", "other": "Copied %n paths"},
  "Cut %n items": {"one": "Cut %n item", "other": "Cut %n items"},

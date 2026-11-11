@@ -30,6 +30,7 @@
 #include <FL/fl_draw.H>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
@@ -42,7 +43,7 @@ namespace flo::ui {
 
 namespace {
 
-const int kBanner = 40, kTrashBar = 48, kDualHeader = 28, kListHeader = 30, kDualFooter = 24;
+const int kBanner = 40, kTrashBar = 48, kDualHeader = 28, kListHeader = 30, kDualFooter = 24, kGridHeader = 36;
 
 std::string quoted(const std::string &s) { return "\xE2\x80\x9C" + s + "\xE2\x80\x9D"; }
 
@@ -74,6 +75,7 @@ Pane::Pane(MainWindow *win, int x, int y, int w, int h, const std::string &folde
     wire(grid_);
     wire(columns_->here());
     grid_->on_new_folder([this] { new_folder(); });
+    grid_->on_zoom([this](double f) { zoom_by(f); });
     list_header_->on_sort([this](int c) { sort_clicked(c); });
     dismiss_->on_click([this] { dismiss_message(); });
     cancel_->on_click([this] {
@@ -1658,6 +1660,9 @@ void Pane::place_children() {
     } else {
         list_header_->hide();
     }
+    grid_header_y_ = ty;
+    if (grid_header())
+        ty += kGridHeader;
     int vh = std::max(10, y() + h() - 8 - ty - (dual_ ? kDualFooter : 0));
     bool cols = view_ == View::Columns && !dual_, space = view_ == View::Space && !dual_;
     cols ? columns_->show() : columns_->hide();
@@ -1722,6 +1727,30 @@ void Pane::draw() {
         fo::text::draw(text, x() + 32, top, right - x() - 32, bh - 4, err ? t.red() : t.foreground(),
                        fo::text::REGULAR, 12);
     }
+    if (grid_header()) {
+        // Files' Grid header: "Grid · n · thumbnails", the zoom and − / +.
+        int mx, px, zy;
+        zoom_rects(mx, px, zy);
+        int n = 0;
+        if (App::get().settings().thumbnails)
+            for (const auto &e : model_.entries)
+                n += !e.is_dir && (e.kind == Kind::Image || e.kind == Kind::Video);
+        std::string cap = std::string(fo::tr("Grid")) + " \xC2\xB7 " + std::to_string(model_.count()) + " \xC2\xB7 " +
+                          (App::get().settings().thumbnails ? fo::trn("%n thumbnails", n)
+                                                            : std::string(fo::tr("thumbnails off")));
+        int cx = x() + 16;
+        fo::text::draw(cap, cx, zy, mx - 72 - cx, 28, t.dim(), fo::text::REGULAR, 12);
+        char pct[16];
+        std::snprintf(pct, sizeof pct, "%.0f%%", grid_zoom_ * 100.0);
+        fo::text::draw(pct, mx - 72, zy, 64, 28, t.dim(), fo::text::REGULAR, 11, FL_ALIGN_RIGHT);
+        int r = t.radius() > 0 ? 5 : 0;
+        fo::paint::round_fill(mx, zy, 36, 28, r, t.card());
+        fo::paint::round_fill(px, zy, 36, 28, r, t.card());
+        fo::text::draw("\xE2\x88\x92", mx, zy, 36, 28, grid_zoom_ > kZoomMin + 1e-6 ? t.accent() : t.dim(),
+                       fo::text::REGULAR, 13, FL_ALIGN_CENTER, fo::text::Elide::None);
+        fo::text::draw("+", px, zy, 36, 28, grid_zoom_ < kZoomMax - 1e-6 ? t.accent() : t.dim(), fo::text::REGULAR,
+                       13, FL_ALIGN_CENTER, fo::text::Elide::None);
+    }
     draw_children();
     if (dual_) {
         // Files' dual footer: visible and loaded counts, the marks, Tab.
@@ -1757,9 +1786,65 @@ int Pane::handle(int event) {
         break;
     case FL_PUSH:
         win_->set_active(this);
+        if (grid_header() && Fl::event_button() == FL_LEFT_MOUSE) {
+            int mx, px, zy;
+            zoom_rects(mx, px, zy);
+            int ex = Fl::event_x(), ey = Fl::event_y();
+            if (ey >= zy && ey < zy + 28) {
+                if (ex >= mx && ex < mx + 36) {
+                    zoom_by(1.0 / kZoomStep);
+                    return 1;
+                }
+                if (ex >= px && ex < px + 36) {
+                    zoom_by(kZoomStep);
+                    return 1;
+                }
+            }
+        }
         break;
     }
     return Fl_Group::handle(event);
+}
+
+// --- Grid zoom ------------------------------------------------------------------
+
+void Pane::zoom_rects(int &minus_x, int &plus_x, int &zy) const {
+    // Files: − at the right edge minus 84, + minus 40, both 36 x 28.
+    int right = x() + w() - 16;
+    minus_x = right - 84;
+    plus_x = right - 40;
+    zy = grid_header_y_;
+}
+
+void Pane::set_grid_zoom(double z) {
+    if (!std::isfinite(z) || z <= 0)
+        return;
+    z = std::clamp(z, kZoomMin, kZoomMax);
+    if (std::fabs(z - grid_zoom_) < 1e-9)
+        return;
+    grid_zoom_ = z;
+    grid_->zoom(z);
+    grid_->scroll_to(0, false);
+    if (grid_->current() >= 0)
+        grid_->ensure_visible(grid_->current(), false);
+    redraw();
+}
+
+void Pane::zoom_by(double factor) {
+    if (!std::isfinite(factor) || factor <= 0)
+        return;
+    set_grid_zoom(grid_zoom_ * factor);
+}
+
+void Pane::zoom_step(int step) {
+    if (view_ != View::Grid || dual_) {
+        fo::Toast::show(win_, fo::tr("Zoom only exists in the Grid view (Ctrl+5)"), 2.5, fo::Toast::Error);
+        return;
+    }
+    if (step == 0)
+        set_grid_zoom(1.0);
+    else
+        zoom_by(step > 0 ? kZoomStep : 1.0 / kZoomStep);
 }
 
 // --- Files' filter, selection, sizes and transfers --------------------------------------

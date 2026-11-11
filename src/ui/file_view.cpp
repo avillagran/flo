@@ -18,6 +18,7 @@
 
 #include <algorithm>
 #include <cctype>
+#include <cmath>
 #include <ctime>
 
 namespace flo::ui {
@@ -162,7 +163,7 @@ void FileView::mode(Mode m) {
     case Mode::Grid:
         always_ring(true);
         layout(Layout::Grid);
-        tile_size(kCellW, kCellH);
+        tile_size(int(std::lround(kCellW * zoom_)), int(std::lround(kCellH * zoom_)));
         padding(0);
         ring_radius(8);
         break;
@@ -183,6 +184,24 @@ void FileView::mode(Mode m) {
         break;
     }
     redraw();
+}
+
+void FileView::zoom(double z) {
+    if (!(z > 0))
+        z = 1.0;
+    zoom_ = z;
+    if (mode_ == Mode::Grid)
+        tile_size(int(std::lround(kCellW * zoom_)), int(std::lround(kCellH * zoom_)));
+    redraw();
+}
+
+int FileView::handle(int event) {
+    if (event == FL_MOUSEWHEEL && mode_ == Mode::Grid && (Fl::event_state() & FL_CTRL) && Fl::event_dy() != 0) {
+        if (zoom_cb_)
+            zoom_cb_(Fl::event_dy() < 0 ? 1.1 : 1.0 / 1.1);
+        return 1;
+    }
+    return fo::Collection::handle(event);
 }
 
 void FileView::groups(const int ends[5]) {
@@ -311,15 +330,22 @@ void FileView::draw_tile_item(int i, int X, int Y, int W, int H, const ItemState
     std::string detail = e.is_dir ? folder_summary(e, path) : si_size(uint64_t(std::max<int64_t>(0, e.size)));
     int ax, ay, aw, ah;
     bool thumb = !e.is_dir && App::get().settings().thumbnails && (e.kind == Kind::Image || e.kind == Kind::Video);
-    draw_tile(X, Y, W, H, s, thumb ? "" : (e.is_dir ? "folder" : kind_icon(e)), display_name(e), detail,
-              e.is_dir ? t.blue() : badge_color(e), e.is_dir, &ax, &ay, &aw, &ah);
+    // The icon is drawn here so it scales with the zoom (Files: 36 px x zoom).
+    draw_tile(X, Y, W, H, s, "", display_name(e), detail, e.is_dir ? t.blue() : badge_color(e), false, &ax, &ay,
+              &aw, &ah);
+    if (!thumb) {
+        int is = std::max(8, std::min(int(std::lround((e.is_dir ? 48 : 36) * zoom_)), ah - 4));
+        fo::icon::draw(e.is_dir ? "folder" : kind_icon(e), ax + (aw - is) / 2, ay + (ah - is) / 2, is,
+                       e.is_dir ? t.blue() : badge_color(e));
+    }
     if (thumb) {
         if (Fl_RGB_Image *img = App::get().thumbs().get(path, e, kGridPx, aw, ah, false, this)) {
             img->draw(ax + (aw - img->w()) / 2, ay + (ah - img->h()) / 2);
             if (e.kind == Kind::Video)
                 fo::icon::draw("play", ax + aw / 2 - 8, ay + ah / 2 - 8, 16, t.bright_foreground());
         } else {
-            fo::icon::draw(kind_icon(e), ax + (aw - 36) / 2, ay + (ah - 36) / 2, 36, badge_color(e));
+            int is = std::max(8, std::min(int(std::lround(36 * zoom_)), ah - 4));
+            fo::icon::draw(kind_icon(e), ax + (aw - is) / 2, ay + (ah - is) / 2, is, badge_color(e));
         }
     } else if (e.is_dir) {
         // Flo's folder peek: the first pictures inside, under the folder glyph.

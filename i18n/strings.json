@@ -84,6 +84,10 @@
   "plural": true
  },
  {
+  "source": "%n thumbnails",
+  "plural": true
+ },
+ {
   "source": "A name can't be empty, contain / or be . or ..",
   "plural": false
  },
@@ -820,6 +824,10 @@
   "plural": false
  },
  {
+  "source": "Reset Grid zoom",
+  "plural": false
+ },
+ {
   "source": "Restore",
   "plural": false
  },
@@ -1060,6 +1068,10 @@
   "plural": false
  },
  {
+  "source": "thumbnails off",
+  "plural": false
+ },
+ {
   "source": "Tools",
   "plural": false
  },
@@ -1164,7 +1176,23 @@
   "plural": false
  },
  {
+  "source": "Zoom in Grid",
+  "plural": false
+ },
+ {
   "source": "Zoom in, out, fit",
+  "plural": false
+ },
+ {
+  "source": "Zoom only exists in the Grid view (Ctrl+5)",
+  "plural": false
+ },
+ {
+  "source": "Zoom out Grid",
+  "plural": false
+ },
+ {
+  "source": "Zoom the Grid in / out / reset",
   "plural": false
  },
  {

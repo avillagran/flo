@@ -305,6 +305,7 @@ void MainWindow::new_tab(const std::string &folder, bool background) {
     }
     Pane *from = active_pane();
     Pane *p = make_pane(folder.empty() ? from->folder() : folder, int(from->view()));
+    p->set_grid_zoom(from->grid_zoom());
     tabs_.insert(tabs_.begin() + tab_ + 1, p);
     if (background) {
         p->hide();
@@ -818,6 +819,9 @@ std::vector<fo::MenuItem> MainWindow::preferences_items() {
             .with_icon("eye")
             .check(p->show_hidden()),
         MenuItem(fo::tr("Dual pane"), "F9", [this] { toggle_dual(); }).with_icon("columns").check(dual_ != nullptr),
+        MenuItem(fo::tr("Zoom in Grid"), "Ctrl++", [this] { active_pane()->zoom_step(1); }).with_icon("plus"),
+        MenuItem(fo::tr("Zoom out Grid"), "Ctrl+-", [this] { active_pane()->zoom_step(-1); }).with_icon("minus"),
+        MenuItem(fo::tr("Reset Grid zoom"), "Ctrl+0", [this] { active_pane()->zoom_step(0); }),
         MenuItem(fo::tr("Inspector"), "Ctrl+Alt+I", [this] { toggle_details(); }).with_icon("info").check(details_on_),
         MenuItem(fo::tr("Show thumbnails of pictures and videos"), "", toggle(&Settings::thumbnails))
             .check(s.thumbnails),
@@ -1050,6 +1054,7 @@ void MainWindow::show_help() {
                   {"Alt+Left / Alt+Right", fo::tr("Back / forward")},
                   {"Alt+Home", fo::tr("Go home")},
                   {"Ctrl+1 \xE2\x80\xA6 5", fo::tr("Groups, List, Columns, Space, Grid")},
+                  {"Ctrl++ / Ctrl+- / Ctrl+0", fo::tr("Zoom the Grid in / out / reset")},
                   {"Space / F3", fo::tr("Preview")},
                   {"Ctrl+A / Ctrl+I", fo::tr("Select all / invert the selection")},
                   {"Insert", fo::tr("Mark and move on")},
@@ -1086,6 +1091,10 @@ void MainWindow::build_shortcuts() {
     on("Ctrl+3", [P] { P()->set_view(V::Columns); });
     on("Ctrl+4", [P] { P()->set_view(V::Space); });
     on("Ctrl+5", [P] { P()->set_view(V::Grid); });
+    on("Ctrl++", [P] { P()->zoom_step(1); });
+    on("Ctrl+=", [P] { P()->zoom_step(1); });
+    on("Ctrl+-", [P] { P()->zoom_step(-1); });
+    on("Ctrl+0", [P] { P()->zoom_step(0); });
     on("Ctrl+Shift+P", [this] { commands(); });
     on("F1", [this] { show_help(); });
     on("Ctrl+?", [this] { show_help(); });
