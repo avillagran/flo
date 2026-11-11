@@ -370,6 +370,9 @@ void Pane::set_view(View v) {
     FileView *old = files();
     int cur = old->current();
     std::vector<int> sel = old->selection();
+    // Hiding the focused view hands the keyboard to some other widget, so
+    // whether the files had it is decided before.
+    const bool had_keyboard = !Fl::focus() || Fl::focus() == old || win_->remembered_focus() == old;
     view_ = v;
     if (v == View::Columns) {
         grid_->hide();
@@ -398,7 +401,7 @@ void Pane::set_view(View v) {
     }
     place_children();
     bar_->update();
-    if (Fl::focus() == old || !Fl::focus())
+    if (had_keyboard)
         focus_view();
 }
 
@@ -853,6 +856,8 @@ void Pane::select_path(const std::string &path) {
 void Pane::focus_view() {
     win_->set_active(this);
     files()->take_focus();
+    // The window gives the keyboard back here when it regains the focus.
+    win_->remember_focus(files());
 }
 
 void Pane::selection_changed() {
