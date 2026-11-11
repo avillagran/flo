@@ -50,6 +50,7 @@ add_library(flo-core STATIC
   src/core/search.cpp
   src/core/session.cpp
   src/core/settings.cpp
+  src/core/properties.cpp
   src/core/starred.cpp
   src/core/thumbnail_cache.cpp
   src/core/thumbnail_service.cpp

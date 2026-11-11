@@ -31,6 +31,10 @@ DYNAMIC = [
     "This folder is not a favorite.", "Type a single line without control characters.",
     "Only folders can be pinned.", "Up to 10000 starred items.",
     "The starred list can't be read; it is kept unchanged.",
+    # Properties (core/properties.cpp reasons, the permission row labels).
+    "Owner", "Group", "Others", "Only local paths have properties.",
+    "Only your own files and folders without special bits can change here.",
+    "The object changed since it was read; reload before applying.",
 ]
 
 call = re.compile(r'\b(?:fo::)?(trn?)\(\s*((?:"(?:[^"\\]|\\.)*"\s*)+)')

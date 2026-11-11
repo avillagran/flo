@@ -12,6 +12,7 @@
 #include "core/uri.h"
 #include "core/xdg.h"
 #include "ui/app.h"
+#include "ui/properties.h"
 #include "ui/columns.h"
 #include "ui/file_view.h"
 #include "ui/main_window.h"
@@ -1204,6 +1205,14 @@ void Pane::toggle_star() {
         files()->redraw();
 }
 
+void Pane::show_properties() {
+    std::vector<std::string> paths;
+    for (const auto &p : selected_paths())
+        if (!p.empty() && p[0] == '/')
+            paths.push_back(p);
+    PropertiesDialog::open(win_, paths);
+}
+
 void Pane::preview() {
     PreviewClient &pv = App::get().preview();
     std::string p = current_path();
@@ -1538,6 +1547,9 @@ std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const st
                 show_item(target);
             }
         }).with_icon("eye"));
+        m.push_back(MenuItem(fo::tr("Properties"), "Alt+Enter", [this, target] {
+            PropertiesDialog::open(win_, {target});
+        }).with_icon("info").disabled(n > 1));
         m.push_back(MenuItem::separator());
     }
     bool change = !trash_view && !recents;

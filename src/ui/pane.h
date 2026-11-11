@@ -176,6 +176,9 @@ public:
     // Ctrl+E: star the marked items (or the focused one), or unstar them
     // when they are all starred.
     void toggle_star();
+    // Alt+Enter: Files' properties and permissions of the marked items (or
+    // the focused one), up to 32.
+    void show_properties();
     const std::vector<std::string> &history_back() const { return back_; }
     const std::vector<std::string> &history_forward() const { return forward_; }
     bool typing() const;

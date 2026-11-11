@@ -809,6 +809,9 @@ std::vector<fo::MenuItem> MainWindow::actions_items() {
         MenuItem(fo::tr("Open with\xE2\x80\xA6"), "Ctrl+Shift+O", [P] { P()->menu_from_keyboard(); })
             .with_icon("external-link")
             .disabled(!has),
+        MenuItem(fo::tr("Properties and permissions"), "Alt+Enter", [P] { P()->show_properties(); })
+            .with_icon("info")
+            .disabled(!has),
         MenuItem(fo::tr("Pin this folder"), "Ctrl+D", [P] { P()->toggle_pin(); }).with_icon("pin"),
         MenuItem(fo::tr("Recents"), "Ctrl+Alt+R", [P] { P()->navigate(kRecents); }).with_icon("recent"),
         MenuItem(fo::tr("Star / unstar"), "Ctrl+E", [P] { P()->toggle_star(); }).with_icon("star"),
@@ -1138,6 +1141,7 @@ void MainWindow::show_help() {
                   {"Ctrl+Alt+D", fo::tr("Favorites and places")},
                   {"Ctrl+E / Ctrl+Alt+E", fo::tr("Star / open Starred")},
                   {"Ctrl+Alt+I", fo::tr("Inspector")},
+                  {"Alt+Enter", fo::tr("Properties and permissions")},
                   {"F10 / Ctrl+,", fo::tr("Actions / Preferences")},
                   {"Ctrl+R", fo::tr("Reload")},
                   {"Menu / Shift+F10", fo::tr("Context menu")},
@@ -1211,10 +1215,7 @@ void MainWindow::build_shortcuts() {
     on("Backspace", [P] { P()->go_up(); });
     on("Alt+Up", [P] { P()->go_up(); });
     on("Alt+Home", [P] { P()->go_home(); });
-    on("Alt+Enter", [this] {
-        if (!details_on_)
-            toggle_details();
-    });
+    on("Alt+Enter", [P] { P()->show_properties(); });
     on("Ctrl+C", [P] { P()->copy(false); });
     on("Ctrl+X", [P] { P()->copy(true); });
     on("Ctrl+V", [P] { P()->paste(); });

@@ -1,5 +1,9 @@
 [
  {
+  "source": " · PARTIAL",
+  "plural": false
+ },
+ {
   "source": "%1 (default)",
   "plural": false
  },
@@ -60,6 +64,10 @@
   "plural": false
  },
  {
+  "source": "%1 · %2 files, %3 folders",
+  "plural": false
+ },
+ {
   "source": "%1 · unavailable",
   "plural": false
  },
@@ -100,6 +108,18 @@
   "plural": true
  },
  {
+  "source": "(no application)",
+  "plural": false
+ },
+ {
+  "source": ", %1 links (not followed)",
+  "plural": false
+ },
+ {
+  "source": ": %1 without read permission",
+  "plural": false
+ },
+ {
   "source": "A label holds 1 to 96 bytes.",
   "plural": false
  },
@@ -112,6 +132,10 @@
   "plural": false
  },
  {
+  "source": "Accessed: %1",
+  "plural": false
+ },
+ {
   "source": "Actions",
   "plural": false
  },
@@ -120,11 +144,31 @@
   "plural": false
  },
  {
+  "source": "Allocated %1 · hard links %2",
+  "plural": false
+ },
+ {
+  "source": "Allow executing as a program",
+  "plural": false
+ },
+ {
+  "source": "Alt+←/→ object · wheel/↑/↓ · Tab permissions",
+  "plural": false
+ },
+ {
   "source": "Apparent total %1",
   "plural": false
  },
  {
   "source": "Appearance",
+  "plural": false
+ },
+ {
+  "source": "Apply",
+  "plural": false
+ },
+ {
+  "source": "Apply permissions",
   "plural": false
  },
  {
@@ -188,6 +232,10 @@
   "plural": false
  },
  {
+  "source": "Change the application: Ctrl+Shift+O in the list",
+  "plural": false
+ },
+ {
   "source": "Clear filter",
   "plural": false
  },
@@ -245,6 +293,10 @@
  },
  {
   "source": "Connecting to %1…",
+  "plural": false
+ },
+ {
+  "source": "Contents: %1",
   "plural": false
  },
  {
@@ -324,11 +376,23 @@
   "plural": false
  },
  {
+  "source": "Created: %1",
+  "plural": false
+ },
+ {
+  "source": "Created: not available on this filesystem",
+  "plural": false
+ },
+ {
   "source": "Ctrl+Z undoes",
   "plural": false
  },
  {
   "source": "Current",
+  "plural": false
+ },
+ {
+  "source": "Current path unavailable",
   "plural": false
  },
  {
@@ -373,6 +437,10 @@
  },
  {
   "source": "Desktop",
+  "plural": false
+ },
+ {
+  "source": "Device %1 · inode %2",
   "plural": false
  },
  {
@@ -524,6 +592,10 @@
   "plural": false
  },
  {
+  "source": "File · apparent %1",
+  "plural": false
+ },
+ {
   "source": "Filter by label",
   "plural": false
  },
@@ -564,6 +636,10 @@
   "plural": false
  },
  {
+  "source": "Full paths in details · Home/End · Tab permissions",
+  "plural": false
+ },
+ {
   "source": "Getting a Dropbox link for %1…",
   "plural": false
  },
@@ -577,6 +653,10 @@
  },
  {
   "source": "Grid",
+  "plural": false
+ },
+ {
+  "source": "Group",
   "plural": false
  },
  {
@@ -609,6 +689,10 @@
  },
  {
   "source": "incl. hidden",
+  "plural": false
+ },
+ {
+  "source": "Inode change: %1",
   "plural": false
  },
  {
@@ -648,6 +732,22 @@
   "plural": false
  },
  {
+  "source": "Link permissions %1 · read-only, the target's are not changed",
+  "plural": false
+ },
+ {
+  "source": "Link permissions (lstat, not the target's): %1 · mode %2",
+  "plural": false
+ },
+ {
+  "source": "Link target: exists",
+  "plural": false
+ },
+ {
+  "source": "Link target: missing (broken link)",
+  "plural": false
+ },
+ {
   "source": "Link → %1",
   "plural": false
  },
@@ -681,6 +781,14 @@
  },
  {
   "source": "Marks",
+  "plural": false
+ },
+ {
+  "source": "MIME type: %1 · Open with: %2",
+  "plural": false
+ },
+ {
+  "source": "Modified: %1",
   "plural": false
  },
  {
@@ -756,6 +864,10 @@
   "plural": false
  },
  {
+  "source": "Next",
+  "plural": false
+ },
+ {
   "source": "Next tab / reopen a closed tab",
   "plural": false
  },
@@ -796,11 +908,23 @@
   "plural": false
  },
  {
+  "source": "No Undo · wheel/↑/↓ · Home/End · Tab permissions",
+  "plural": false
+ },
+ {
+  "source": "No valid properties; you can reload.",
+  "plural": false
+ },
+ {
   "source": "Nothing to paste",
   "plural": false
  },
  {
   "source": "now",
+  "plural": false
+ },
+ {
+  "source": "Object %1 of %2",
   "plural": false
  },
  {
@@ -825,6 +949,18 @@
  },
  {
   "source": "Only local folders keep a view.",
+  "plural": false
+ },
+ {
+  "source": "Only local paths have properties.",
+  "plural": false
+ },
+ {
+  "source": "Only this object; no recursion, ACLs or owner change.",
+  "plural": false
+ },
+ {
+  "source": "Only your own files and folders without special bits can change here.",
   "plural": false
  },
  {
@@ -860,6 +996,18 @@
   "plural": false
  },
  {
+  "source": "Others",
+  "plural": false
+ },
+ {
+  "source": "Owner",
+  "plural": false
+ },
+ {
+  "source": "Owner: %1 · Group: %2",
+  "plural": false
+ },
+ {
   "source": "partial",
   "plural": false
  },
@@ -873,6 +1021,22 @@
  },
  {
   "source": "Paste into folder",
+  "plural": false
+ },
+ {
+  "source": "Permissions %1 → %2 · every link to the inode",
+  "plural": false
+ },
+ {
+  "source": "Permissions applied. This operation has no Undo.",
+  "plural": false
+ },
+ {
+  "source": "Permissions applied; reload the properties. This operation has no Undo.",
+  "plural": false
+ },
+ {
+  "source": "Permissions: %1 · octal mode %2",
   "plural": false
  },
  {
@@ -916,11 +1080,47 @@
   "plural": false
  },
  {
+  "source": "Previous",
+  "plural": false
+ },
+ {
   "source": "Previous / next file",
   "plural": false
  },
  {
+  "source": "Properties",
+  "plural": false
+ },
+ {
+  "source": "Properties and permissions",
+  "plural": false
+ },
+ {
+  "source": "Properties read",
+  "plural": false
+ },
+ {
+  "source": "Properties: choose between 1 and 32 objects",
+  "plural": false
+ },
+ {
   "source": "Public",
+  "plural": false
+ },
+ {
+  "source": "Raw target (not opened): %1",
+  "plural": false
+ },
+ {
+  "source": "Read-only or stale: Reload to check again.",
+  "plural": false
+ },
+ {
+  "source": "Reading outside the UI…",
+  "plural": false
+ },
+ {
+  "source": "Reading properties…",
   "plural": false
  },
  {
@@ -989,6 +1189,10 @@
  },
  {
   "source": "Replacing moves it to the trash.",
+  "plural": false
+ },
+ {
+  "source": "Requested path: %1",
   "plural": false
  },
  {
@@ -1073,6 +1277,10 @@
  },
  {
   "source": "Selection",
+  "plural": false
+ },
+ {
+  "source": "Selection of %1 objects: %2",
   "plural": false
  },
  {
@@ -1180,6 +1388,10 @@
   "plural": false
  },
  {
+  "source": "Special object · apparent %1",
+  "plural": false
+ },
+ {
   "source": "Star",
   "plural": false
  },
@@ -1213,6 +1425,10 @@
  },
  {
   "source": "Subfolders not watched · not a snapshot",
+  "plural": false
+ },
+ {
+  "source": "Symbolic link (not followed)",
   "plural": false
  },
  {
@@ -1277,6 +1493,10 @@
  },
  {
   "source": "The folder views file can't be changed.",
+  "plural": false
+ },
+ {
+  "source": "The object changed since it was read; reload before applying.",
   "plural": false
  },
  {
@@ -1368,6 +1588,10 @@
   "plural": false
  },
  {
+  "source": "unknown filesystem",
+  "plural": false
+ },
+ {
   "source": "Unknown size",
   "plural": false
  },
@@ -1400,6 +1624,10 @@
   "plural": false
  },
  {
+  "source": "Verified path: %1",
+  "plural": false
+ },
+ {
   "source": "Video",
   "plural": false
  },
@@ -1413,6 +1641,14 @@
  },
  {
   "source": "Views",
+  "plural": false
+ },
+ {
+  "source": "Volume: %1 · %2 free of %3",
+  "plural": false
+ },
+ {
+  "source": "Volume: unavailable",
   "plural": false
  },
  {
