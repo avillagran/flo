@@ -27,6 +27,7 @@ public:
     ~DetailsPane() override;
     // Shows the cursor's item of `pane` (nullptr: nothing).
     void show_from(Pane *pane);
+    void relabel(); // the language changed: describe the item again
     void resize(int x, int y, int w, int h) override;
     void draw() override;
 

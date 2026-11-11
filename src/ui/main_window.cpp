@@ -122,6 +122,7 @@ void MainWindow::language_changed() {
         if (p)
             p->relabel();
     rebuild_sidebar();
+    details_->relabel();
     if (Pane *p = active_pane())
         pane_moved(p); // the title
     redraw();

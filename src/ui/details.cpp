@@ -118,6 +118,12 @@ void DetailsPane::resize(int X, int Y, int W, int H) {
     open_->resize(X + kPad, Y + H - kPad - 40, std::max(40, W - 2 * kPad), 40);
 }
 
+void DetailsPane::relabel() {
+    path_.clear();
+    has_ = false;
+    show_from(pane_);
+}
+
 void DetailsPane::show_from(Pane *pane) {
     pane_ = pane;
     const Entry *e = pane && visible_r() ? pane->current_entry() : nullptr;
