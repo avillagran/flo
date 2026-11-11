@@ -123,6 +123,51 @@ TEST(folder_summary_peeks_first_two_pictures) {
           !is_peek_picture(".jpg") && !is_peek_picture("d.txt"));
 }
 
+TEST(listing_cache_is_bounded_and_moves) {
+    auto listing = [](int n) {
+        CachedListing l;
+        for (int i = 0; i < n; ++i) {
+            Entry e;
+            e.name = "f" + std::to_string(i);
+            l.entries.push_back(e);
+        }
+        return l;
+    };
+    ListingCache c(3, 100);
+    const std::string a = ListingCache::key("/a", false, SortMode::Name);
+    CHECK(a != ListingCache::key("/a", true, SortMode::Name));
+    CHECK(a != ListingCache::key("/a", false, SortMode::Size));
+    c.put(a, listing(10));
+    c.put("b", listing(10));
+    c.put("c", listing(10));
+    CHECK_EQ(c.listings(), std::size_t(3));
+    CHECK_EQ(c.entries(), std::size_t(30));
+    c.put("d", listing(10)); // over three listings: the oldest (a) goes
+    CHECK(!c.contains(a) && c.contains("d"));
+    CachedListing out;
+    CHECK(c.take("b", out));
+    CHECK_EQ(out.entries.size(), std::size_t(10));
+    CHECK(!c.contains("b")); // moved out, never held twice
+    CHECK_EQ(c.entries(), std::size_t(20));
+    CHECK(!c.take("b", out));
+    c.put("big", listing(51)); // over half the entry budget: not kept
+    CHECK(!c.contains("big"));
+    CachedListing peeked = listing(40);
+    peeked.peeks["/x/sub"] = listing(2).entries;
+    c.put("e", std::move(peeked));
+    c.put("f", listing(45)); // 10 + 42 + 45 > 100 → the oldest go
+    CHECK(c.entries() <= 100);
+    CHECK(c.contains("f"));
+    c.clear();
+    CHECK_EQ(c.entries(), std::size_t(0));
+    std::vector<Entry> x = listing(3).entries, y = x;
+    CHECK(same_listing(x, y));
+    y[1].mtime_ns = 5;
+    CHECK(!same_listing(x, y));
+    y.pop_back();
+    CHECK(!same_listing(x, y));
+}
+
 TEST(listing_50k_entries_under_a_second) {
     const std::string d = private_dir("big");
     for (int i = 0; i < 50000; ++i) {

@@ -12,7 +12,7 @@ tracks each Folio feature in Flo: the core piece (flo-core) and the window
 | Hidden files toggle | Done (`ListOptions::show_hidden`, setting `view.hidden`) |
 | Folder item counts, counted lazily (visible first) | Done (`Lister::count_items`) |
 | Live reload, debounced 250 ms | Done (`Watcher`) |
-| Remembered recent listings for instant back/forward | Not yet |
+| Remembered recent listings for instant back/forward | Done (`ListingCache`, shared by every window): a folder's listing (with item counts and peeks) is moved into the cache when a pane leaves it or starts a search, and moved back out when one returns, so it is never held twice; it shows in the same frame and is re-read, kept as is when unchanged (`same_listing`). Bounded to 24 listings and 12,000 entries (Folio: 64 listings, no entry bound); `FLO_TRACE_LISTINGS=1` logs each recall. The columns view still lists its parent columns afresh |
 | 50,000 entries in under a second | Done: 110–145 ms for 50k entries (test) |
 | Progressive listing of slow (SFTP) folders | Done (snapshots after 150 ms) |
 | Shared freedesktop thumbnail cache, failure markers | Done (`fail/flo/` instead of `fail/folio`) |

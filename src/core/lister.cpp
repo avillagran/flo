@@ -191,6 +191,67 @@ FolderSummary summarize_folder(const std::string &folder, bool show_hidden, int 
     return out;
 }
 
+std::string ListingCache::key(const std::string &folder, bool show_hidden, SortMode sort) {
+    return folder + '\n' + (show_hidden ? "h" : "") + '\n' + sort_mode_name(sort);
+}
+
+static std::size_t weight(const CachedListing &l) {
+    std::size_t n = l.entries.size();
+    for (const auto &p : l.peeks)
+        n += p.second.size();
+    return n;
+}
+
+void ListingCache::erase(std::list<Item>::iterator it) {
+    entries_ -= weight(it->listing);
+    index_.erase(it->key);
+    lru_.erase(it);
+}
+
+void ListingCache::put(const std::string &key, CachedListing &&l) {
+    auto old = index_.find(key);
+    if (old != index_.end())
+        erase(old->second);
+    const std::size_t w = weight(l);
+    if (max_listings_ == 0 || w > max_entries_ / 2)
+        return;
+    lru_.push_front(Item{key, std::move(l)});
+    index_[key] = lru_.begin();
+    entries_ += w;
+    while (!lru_.empty() && (lru_.size() > max_listings_ || entries_ > max_entries_))
+        erase(std::prev(lru_.end()));
+}
+
+bool ListingCache::take(const std::string &key, CachedListing &out) {
+    auto it = index_.find(key);
+    if (it == index_.end())
+        return false;
+    auto item = it->second;
+    entries_ -= weight(item->listing);
+    out = std::move(item->listing);
+    index_.erase(it);
+    lru_.erase(item);
+    return true;
+}
+
+void ListingCache::clear() {
+    lru_.clear();
+    index_.clear();
+    entries_ = 0;
+}
+
+bool same_listing(const std::vector<Entry> &a, const std::vector<Entry> &b) {
+    if (a.size() != b.size())
+        return false;
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        const Entry &x = a[i], &y = b[i];
+        if (x.name != y.name || x.mtime_ns != y.mtime_ns || x.size != y.size || x.mode != y.mode ||
+            x.is_dir != y.is_dir || x.link_target != y.link_target || x.mime != y.mime)
+            return false;
+    }
+    return true;
+}
+
 Lister::Lister(EventQueue &queue) : poster_(queue.poster()) {}
 
 Lister::~Lister() {

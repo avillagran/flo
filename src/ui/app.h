@@ -6,6 +6,7 @@
 
 #include "core/dbus_service.h"
 #include "core/event_queue.h"
+#include "core/lister.h"
 #include "core/network.h"
 #include "core/places.h"
 #include "core/process.h"
@@ -68,6 +69,8 @@ public:
     Devices &devices() { return *devices_; }
     Network &network() { return *network_; }
     Settings &settings() { return settings_; }
+    // Folders just left by any window, for instant Back/Forward.
+    ListingCache &listings() { return listings_; }
     const PlacesData &places() const { return places_; }
     PreviewClient &preview() { return preview_; }
 
@@ -106,6 +109,7 @@ private:
     std::unique_ptr<Network> network_;
     std::unique_ptr<DBusService> dbus_;
     Settings settings_;
+    ListingCache listings_;
     PlacesData places_;
     PreviewClient preview_;
     std::vector<MainWindow *> windows_;

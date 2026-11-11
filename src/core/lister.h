@@ -7,7 +7,9 @@
 
 #include <functional>
 #include <memory>
+#include <list>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace flo {
@@ -57,6 +59,47 @@ struct FolderSummary {
 FolderSummary summarize_folder(const std::string &folder, bool show_hidden, int peek = 2);
 // Whether a file name is one of the pictures a folder peek shows.
 bool is_peek_picture(const char *name);
+
+// Folders just left, so Back, Forward or a folder seen a moment ago shows in
+// the same frame (Folio's recentListings), then is re-read in the
+// background. A listing is moved in when its window leaves the folder and
+// moved out when one comes back, so it never exists twice. Bounded by
+// listings and by entries: big folders are simply listed again.
+struct CachedListing {
+    std::vector<Entry> entries; // with item counts
+    std::unordered_map<std::string, std::vector<Entry>> peeks;
+};
+
+class ListingCache {
+public:
+    explicit ListingCache(std::size_t max_listings = 24, std::size_t max_entries = 12000)
+        : max_listings_(max_listings), max_entries_(max_entries) {}
+
+    static std::string key(const std::string &folder, bool show_hidden, SortMode sort);
+    // Keeps `l` under `key` (replacing what was there); listings over half
+    // the entry budget are not kept.
+    void put(const std::string &key, CachedListing &&l);
+    // Moves the listing out (nullopt-like: false when unknown).
+    bool take(const std::string &key, CachedListing &out);
+    bool contains(const std::string &key) const { return index_.count(key) != 0; }
+    void clear();
+    std::size_t listings() const { return lru_.size(); }
+    std::size_t entries() const { return entries_; }
+
+private:
+    struct Item {
+        std::string key;
+        CachedListing listing;
+    };
+    void erase(std::list<Item>::iterator it);
+    std::size_t max_listings_, max_entries_, entries_ = 0;
+    std::list<Item> lru_; // front = newest
+    std::unordered_map<std::string, std::list<Item>::iterator> index_;
+};
+
+// Whether two listings show the same items (names, kinds, sizes, times):
+// after a remembered listing, an unchanged re-read keeps what is shown.
+bool same_listing(const std::vector<Entry> &a, const std::vector<Entry> &b);
 
 class Lister {
 public:

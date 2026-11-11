@@ -25,6 +25,8 @@
 #include <FL/fl_draw.H>
 
 #include <algorithm>
+#include <cstdio>
+#include <cstdlib>
 #include <cstring>
 
 namespace flo::ui {
@@ -305,6 +307,7 @@ Pane::Pane(MainWindow *win, int x, int y, int w, int h, const std::string &folde
 }
 
 Pane::~Pane() {
+    remember_listing();
     unwatch();
     if (App::get().preview().owner() == this)
         App::get().preview().close();
@@ -433,6 +436,8 @@ void Pane::navigate(const std::string &path, const std::string &select, bool his
     if (bar_->editing())
         bar_->stop_editing(false);
     message_.clear();
+    if (p != folder_)
+        remember_listing();
     pending_select_ = select;
     keep_paths_.clear();
     keep_current_.clear();
@@ -442,8 +447,14 @@ void Pane::navigate(const std::string &path, const std::string &select, bool his
     model_.peeks.clear();
     model_.error.clear();
     model_.loading = true;
+    const bool recalled = recall_listing();
     files()->reload(true);
     files()->set_current(-1, true);
+    if (recalled && !pending_select_.empty()) {
+        int at = model_.index_of_name(pending_select_);
+        if (at >= 0)
+            files()->set_current(at, true);
+    }
     build_crumbs();
     after_folder_change();
     list_now(false);
@@ -542,10 +553,21 @@ void Pane::landed(ListingPtr l, bool keep) {
     FileView *v = files();
     std::string cur_before = keep ? keep_current_ : std::string();
     int cur_row = v->current();
-    model_.entries = l->entries;
+    bool same = false;
+    if (showing_cached_) {
+        // A remembered listing stays up until the re-read is complete, and
+        // stays as it is (with its counts and peeks) when nothing changed.
+        if (!l->complete)
+            return;
+        showing_cached_ = false;
+        same = l->error.empty() && same_listing(model_.entries, l->entries);
+    }
+    if (!same)
+        model_.entries = l->entries;
     model_.error = l->error;
     model_.loading = !l->complete;
-    v->reload(false);
+    if (!same)
+        v->reload(false);
     if (!pending_select_.empty()) {
         int at = model_.index_of_name(pending_select_);
         if (at < 0)
@@ -587,6 +609,38 @@ void Pane::landed(ListingPtr l, bool keep) {
     place_children();
     selection_changed();
     redraw();
+}
+
+void Pane::remember_listing() {
+    // A remembered listing still being re-read is as good as when it was kept.
+    const bool complete = !model_.loading || showing_cached_;
+    showing_cached_ = false;
+    if (folder_.empty() || in_recents() || !query_.empty() || !complete || !model_.error.empty() ||
+        model_.entries.empty())
+        return;
+    CachedListing l;
+    l.entries = std::move(model_.entries);
+    l.peeks = std::move(model_.peeks);
+    model_.entries.clear();
+    model_.peeks.clear();
+    App::get().listings().put(ListingCache::key(folder_, hidden_, sort_), std::move(l));
+}
+
+bool Pane::recall_listing() {
+    showing_cached_ = false;
+    if (in_recents())
+        return false;
+    CachedListing l;
+    if (!App::get().listings().take(ListingCache::key(folder_, hidden_, sort_), l))
+        return false;
+    model_.entries = std::move(l.entries);
+    model_.peeks = std::move(l.peeks);
+    showing_cached_ = true;
+    static const bool trace = std::getenv("FLO_TRACE_LISTINGS") != nullptr;
+    if (trace)
+        std::fprintf(stderr, "flo: recalled %s (%d entries, %zu remembered listings)\n", folder_.c_str(),
+                     model_.count(), App::get().listings().listings());
+    return true;
 }
 
 void Pane::count_folders() {
@@ -1149,13 +1203,19 @@ void Pane::set_query(const std::string &q) {
         t.erase(0, 1);
     if (t == query_ && !t.empty())
         return;
+    if (query_.empty() && !t.empty())
+        remember_listing(); // the folder comes back at once when the search ends
     query_ = t;
     if (query_.empty()) {
         searcher_->cancel();
         searching_ = false;
         files()->show_folders(false);
         files()->empty_text(fo::tr("Empty"));
+        model_.entries.clear();
+        model_.peeks.clear();
         model_.loading = true;
+        if (recall_listing())
+            files()->reload(true);
         list_now(false);
         place_children();
         return;

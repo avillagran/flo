@@ -151,6 +151,10 @@ public:
 
 private:
     void list_now(bool keep_selection);
+    // Moves what is shown into the App's listing cache (leaving a folder,
+    // starting a search) and back out (arriving, ending the search).
+    void remember_listing();
+    bool recall_listing();
     void landed(ListingPtr listing, bool keep);
     void count_folders();
     void watch();
@@ -195,6 +199,7 @@ private:
     int watch_id_ = 0;
     std::string query_;
     bool searching_ = false;
+    bool showing_cached_ = false; // a remembered listing, being re-read
 
     std::string message_;
     bool message_error_ = true;
