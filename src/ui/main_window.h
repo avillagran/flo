@@ -44,6 +44,7 @@ public:
     void pane_moved(Pane *p);     // folder changed
     void pane_selected(Pane *p);  // selection changed
     void rebuild_sidebar();
+    void language_changed(); // relabels everything set once
     void focus_sidebar();
     void cycle_focus(bool back); // Tab / Shift+Tab
     void show_help();

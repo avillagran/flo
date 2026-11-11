@@ -117,6 +117,16 @@ void MainWindow::set_active(Pane *p) {
     }
 }
 
+void MainWindow::language_changed() {
+    for (Pane *p : panes_)
+        if (p)
+            p->relabel();
+    rebuild_sidebar();
+    if (Pane *p = active_pane())
+        pane_moved(p); // the title
+    redraw();
+}
+
 void MainWindow::open_split() {
     if (split()) {
         panes_[1]->focus_view();

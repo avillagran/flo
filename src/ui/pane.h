@@ -53,6 +53,7 @@ public:
     void resize(int x, int y, int w, int h) override;
     void draw() override;
     void set_active_marker(bool on) { marker_ = on; redraw(); }
+    void relabel(); // the language changed
 
     fo::Breadcrumbs *crumbs = nullptr;
     fo::TextField *path_field = nullptr, *search_field = nullptr;
@@ -151,6 +152,8 @@ public:
 
     void show_message(const std::string &text, bool error = true);
     void dismiss_message();
+    // The language changed: labels set once are set again.
+    void relabel();
 
     void resize(int x, int y, int w, int h) override;
     void draw() override;

@@ -282,6 +282,11 @@ int App::run(const std::string &folder, const std::string &select) {
     bookmarks_watch_ = watcher_->watch_file(places::bookmarks_path(), [this] { refresh_places(); });
 
     open_window(folder, select);
+    // Omarchy's language picked live: every window relabels (Folio does too).
+    fo::i18n::on_change([this] {
+        for (MainWindow *w : windows_)
+            w->language_changed();
+    });
 
     // Drives: GIO's volume monitor, started once the window is up.
     Fl::add_timeout(0.5, [](void *d) {

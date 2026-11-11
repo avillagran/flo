@@ -83,9 +83,7 @@ PathBar::PathBar(int x, int y, int w, int h, Pane *pane) : Fl_Group(x, y, w, h),
     close_b->hide();
     end();
     resizable(nullptr);
-    hidden_b->tooltip_text(fo::tr("Show hidden files (Ctrl+H)"));
-    details_b->tooltip_text(fo::tr("Details (Ctrl+I)"));
-    close_b->tooltip_text(fo::tr("Close this pane (Ctrl+W)"));
+    relabel();
 
     crumbs->on_navigate([this](int i) {
         const auto &segs = crumbs->segments();
@@ -128,6 +126,12 @@ PathBar::PathBar(int x, int y, int w, int h, Pane *pane) : Fl_Group(x, y, w, h),
         }
         return false;
     });
+}
+
+void PathBar::relabel() {
+    hidden_b->tooltip_text(fo::tr("Show hidden files (Ctrl+H)"));
+    details_b->tooltip_text(fo::tr("Details (Ctrl+I)"));
+    close_b->tooltip_text(fo::tr("Close this pane (Ctrl+W)"));
 }
 
 void PathBar::search_timer(void *data) {
@@ -263,13 +267,10 @@ Pane::Pane(MainWindow *win, int x, int y, int w, int h, const std::string &folde
     hidden_ = app.settings().show_hidden;
     sort_ = app.settings().sort;
     dismiss_ = new fo::IconButton(0, 0, 32, 32, "x", "Dismiss");
-    dismiss_->tooltip_text(fo::tr("Dismiss"));
     dismiss_->hide();
     cancel_ = new fo::Button(0, 0, 88, 28, nullptr);
-    cancel_->copy_label(fo::tr("Cancel"));
     cancel_->hide();
     empty_trash_ = new fo::Button(0, 0, 140, 32, nullptr);
-    empty_trash_->copy_label(fo::tr("Empty Trash"));
     empty_trash_->hide();
     grid_ = new FileView(x, y, w, h, &model_);
     columns_ = new ColumnsView(x, y, w, h, this);
@@ -302,8 +303,22 @@ Pane::Pane(MainWindow *win, int x, int y, int w, int h, const std::string &folde
     };
     ops_ = std::make_unique<FileOps>(app.queue(), cb);
 
+    relabel();
     set_view(view);
     navigate(folder.empty() ? xdg::home() : folder, {}, false);
+}
+
+void Pane::relabel() {
+    dismiss_->tooltip_text(fo::tr("Dismiss"));
+    cancel_->copy_label(fo::tr("Cancel"));
+    empty_trash_->copy_label(fo::tr("Empty Trash"));
+    if (bar_ && !folder_.empty()) {
+        bar_->relabel();
+        build_crumbs(); // Recents, Trash
+        bar_->update();
+    }
+    files()->empty_text(query_.empty() ? fo::tr("Empty") : fo::tr("No matches"));
+    redraw();
 }
 
 Pane::~Pane() {
@@ -1647,7 +1662,7 @@ std::string Pane::banner_text(bool &error, bool &progress) const {
     }
     if (!model_.error.empty()) {
         error = true;
-        return model_.error;
+        return fo::tr(model_.error.c_str()); // the core's sentences are in the catalogs
     }
     if (progress_on_) {
         progress = true;

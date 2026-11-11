@@ -104,6 +104,16 @@ if(FLO_BUILD_GUI)
   add_subdirectory(third_party/lib-fltk-omarchy EXCLUDE_FROM_ALL)
   file(GLOB FLO_UI_SOURCES CONFIGURE_DEPENDS src/ui/*.cpp)
   target_sources(flo PRIVATE ${FLO_UI_SOURCES})
+  # Translation catalogs (i18n/<language>.json), embedded as read-only data.
+  file(GLOB FLO_CATALOGS CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/i18n/*.json)
+  add_custom_command(
+    OUTPUT ${CMAKE_CURRENT_BINARY_DIR}/flo_catalogs.cpp
+    COMMAND ${CMAKE_COMMAND} -DSOURCE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/i18n
+            -DOUTPUT=${CMAKE_CURRENT_BINARY_DIR}/flo_catalogs.cpp
+            -P ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed-catalogs.cmake
+    DEPENDS ${FLO_CATALOGS} ${CMAKE_CURRENT_SOURCE_DIR}/cmake/embed-catalogs.cmake
+    COMMENT "Embedding translation catalogs")
+  target_sources(flo PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/flo_catalogs.cpp)
   target_link_libraries(flo PRIVATE fltk-omarchy::fltk-omarchy)
   target_compile_definitions(flo PRIVATE FLO_HAVE_GUI=1)
 endif()

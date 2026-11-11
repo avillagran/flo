@@ -1,0 +1,782 @@
+[
+ {
+  "source": "%1 (default)",
+  "plural": false
+ },
+ {
+  "source": "%1 already exists",
+  "plural": false
+ },
+ {
+  "source": "%1 can't be opened.",
+  "plural": false
+ },
+ {
+  "source": "%1 now opens %2 files",
+  "plural": false
+ },
+ {
+  "source": "%1 of %2",
+  "plural": false
+ },
+ {
+  "source": "%1 will be deleted permanently. This can't be undone.",
+  "plural": false
+ },
+ {
+  "source": "%n items",
+  "plural": true
+ },
+ {
+  "source": "%n items will be deleted permanently. This can't be undone.",
+  "plural": true
+ },
+ {
+  "source": "A name can't be empty, contain / or be . or ..",
+  "plural": false
+ },
+ {
+  "source": "Add or remove one from the selection",
+  "plural": false
+ },
+ {
+  "source": "Apply to all",
+  "plural": false
+ },
+ {
+  "source": "Back / forward (or the mouse's thumb buttons)",
+  "plural": false
+ },
+ {
+  "source": "Biggest first (S)",
+  "plural": false
+ },
+ {
+  "source": "Cancel",
+  "plural": false
+ },
+ {
+  "source": "Close",
+  "plural": false
+ },
+ {
+  "source": "Close (Space)",
+  "plural": false
+ },
+ {
+  "source": "Close the window",
+  "plural": false
+ },
+ {
+  "source": "Close this pane (Ctrl+W)",
+  "plural": false
+ },
+ {
+  "source": "Columns (Ctrl+3); click for grid",
+  "plural": false
+ },
+ {
+  "source": "Compress",
+  "plural": false
+ },
+ {
+  "source": "Compressing",
+  "plural": false
+ },
+ {
+  "source": "Connect",
+  "plural": false
+ },
+ {
+  "source": "Connecting to %1…",
+  "plural": false
+ },
+ {
+  "source": "Copied %n items",
+  "plural": true
+ },
+ {
+  "source": "Copied %n paths",
+  "plural": true
+ },
+ {
+  "source": "Copied the path",
+  "plural": false
+ },
+ {
+  "source": "Copy",
+  "plural": false
+ },
+ {
+  "source": "Copy Path",
+  "plural": false
+ },
+ {
+  "source": "Copy the path as text",
+  "plural": false
+ },
+ {
+  "source": "Copy, cut, paste files",
+  "plural": false
+ },
+ {
+  "source": "Copying",
+  "plural": false
+ },
+ {
+  "source": "Couldn't get a Dropbox link for %1: %2",
+  "plural": false
+ },
+ {
+  "source": "Couldn't send to %1: %2",
+  "plural": false
+ },
+ {
+  "source": "Ctrl+Z undoes",
+  "plural": false
+ },
+ {
+  "source": "Cut",
+  "plural": false
+ },
+ {
+  "source": "Cut %n items",
+  "plural": true
+ },
+ {
+  "source": "Delete",
+  "plural": false
+ },
+ {
+  "source": "Delete %n Items",
+  "plural": true
+ },
+ {
+  "source": "Delete for good?",
+  "plural": false
+ },
+ {
+  "source": "Delete moves things to the trash; pasting there doesn't",
+  "plural": false
+ },
+ {
+  "source": "Delete Permanently…",
+  "plural": false
+ },
+ {
+  "source": "Deleted",
+  "plural": false
+ },
+ {
+  "source": "Deleting",
+  "plural": false
+ },
+ {
+  "source": "Desktop",
+  "plural": false
+ },
+ {
+  "source": "Details (Ctrl+I)",
+  "plural": false
+ },
+ {
+  "source": "Dimensions",
+  "plural": false
+ },
+ {
+  "source": "Dismiss",
+  "plural": false
+ },
+ {
+  "source": "Documents",
+  "plural": false
+ },
+ {
+  "source": "Domain",
+  "plural": false
+ },
+ {
+  "source": "Downloads",
+  "plural": false
+ },
+ {
+  "source": "Drag on empty space",
+  "plural": false
+ },
+ {
+  "source": "Drives",
+  "plural": false
+ },
+ {
+  "source": "Dropbox Link",
+  "plural": false
+ },
+ {
+  "source": "Dropbox link for %1 copied.",
+  "plural": false
+ },
+ {
+  "source": "Dropbox links need dropbox-cli, which isn't installed.",
+  "plural": false
+ },
+ {
+  "source": "Duplicate",
+  "plural": false
+ },
+ {
+  "source": "Duplicating",
+  "plural": false
+ },
+ {
+  "source": "Eject",
+  "plural": false
+ },
+ {
+  "source": "Empty",
+  "plural": false
+ },
+ {
+  "source": "Empty the trash?",
+  "plural": false
+ },
+ {
+  "source": "Empty Trash",
+  "plural": false
+ },
+ {
+  "source": "Empty Trash…",
+  "plural": false
+ },
+ {
+  "source": "Everything else",
+  "plural": false
+ },
+ {
+  "source": "Extract Here",
+  "plural": false
+ },
+ {
+  "source": "Extracting",
+  "plural": false
+ },
+ {
+  "source": "Folder",
+  "plural": false
+ },
+ {
+  "source": "From",
+  "plural": false
+ },
+ {
+  "source": "Getting a Dropbox link for %1…",
+  "plural": false
+ },
+ {
+  "source": "Go home",
+  "plural": false
+ },
+ {
+  "source": "Go to the parent folder",
+  "plural": false
+ },
+ {
+  "source": "Grid (Ctrl+1); click for list",
+  "plural": false
+ },
+ {
+  "source": "Grid, list or columns",
+  "plural": false
+ },
+ {
+  "source": "Hide Hidden Files",
+  "plural": false
+ },
+ {
+  "source": "Home",
+  "plural": false
+ },
+ {
+  "source": "In list and columns: into a folder / back out",
+  "plural": false
+ },
+ {
+  "source": "Keep Both",
+  "plural": false
+ },
+ {
+  "source": "Kind",
+  "plural": false
+ },
+ {
+  "source": "List (Ctrl+2); click for columns",
+  "plural": false
+ },
+ {
+  "source": "LocalSend…",
+  "plural": false
+ },
+ {
+  "source": "Making a preview…",
+  "plural": false
+ },
+ {
+  "source": "Modified",
+  "plural": false
+ },
+ {
+  "source": "Mounting…",
+  "plural": false
+ },
+ {
+  "source": "Move between the sidebar and the panes",
+  "plural": false
+ },
+ {
+  "source": "Move the selection",
+  "plural": false
+ },
+ {
+  "source": "Move to the trash",
+  "plural": false
+ },
+ {
+  "source": "Moved to the trash",
+  "plural": false
+ },
+ {
+  "source": "Moving",
+  "plural": false
+ },
+ {
+  "source": "Moving to the trash",
+  "plural": false
+ },
+ {
+  "source": "Music",
+  "plural": false
+ },
+ {
+  "source": "Name",
+  "plural": false
+ },
+ {
+  "source": "New folder",
+  "plural": false
+ },
+ {
+  "source": "New Folder",
+  "plural": false
+ },
+ {
+  "source": "New window",
+  "plural": false
+ },
+ {
+  "source": "Newest",
+  "plural": false
+ },
+ {
+  "source": "Newest first (S)",
+  "plural": false
+ },
+ {
+  "source": "No matches",
+  "plural": false
+ },
+ {
+  "source": "No preview for this kind of file. ⏎ opens it.",
+  "plural": false
+ },
+ {
+  "source": "No terminal was found.",
+  "plural": false
+ },
+ {
+  "source": "Nothing selected",
+  "plural": false
+ },
+ {
+  "source": "Nothing to paste",
+  "plural": false
+ },
+ {
+  "source": "OK",
+  "plural": false
+ },
+ {
+  "source": "Oldest",
+  "plural": false
+ },
+ {
+  "source": "Oldest first (S)",
+  "plural": false
+ },
+ {
+  "source": "Open",
+  "plural": false
+ },
+ {
+  "source": "Open (⏎)",
+  "plural": false
+ },
+ {
+  "source": "Open folder",
+  "plural": false
+ },
+ {
+  "source": "Open Folder",
+  "plural": false
+ },
+ {
+  "source": "Open in its application",
+  "plural": false
+ },
+ {
+  "source": "Open in New Window",
+  "plural": false
+ },
+ {
+  "source": "Open in Split Pane",
+  "plural": false
+ },
+ {
+  "source": "Open Terminal Here",
+  "plural": false
+ },
+ {
+  "source": "Open With",
+  "plural": false
+ },
+ {
+  "source": "Password",
+  "plural": false
+ },
+ {
+  "source": "Paste",
+  "plural": false
+ },
+ {
+  "source": "Paste Into Folder",
+  "plural": false
+ },
+ {
+  "source": "Pictures",
+  "plural": false
+ },
+ {
+  "source": "Pin",
+  "plural": false
+ },
+ {
+  "source": "Pin or unpin the folder",
+  "plural": false
+ },
+ {
+  "source": "Pinned",
+  "plural": false
+ },
+ {
+  "source": "Pinned %1",
+  "plural": false
+ },
+ {
+  "source": "Points to",
+  "plural": false
+ },
+ {
+  "source": "Preview",
+  "plural": false
+ },
+ {
+  "source": "Preview the selected file",
+  "plural": false
+ },
+ {
+  "source": "Previous / next file",
+  "plural": false
+ },
+ {
+  "source": "Public",
+  "plural": false
+ },
+ {
+  "source": "Recents",
+  "plural": false
+ },
+ {
+  "source": "Recents can't hold files",
+  "plural": false
+ },
+ {
+  "source": "Redo %1",
+  "plural": false
+ },
+ {
+  "source": "Reload",
+  "plural": false
+ },
+ {
+  "source": "Rename",
+  "plural": false
+ },
+ {
+  "source": "Rename / duplicate",
+  "plural": false
+ },
+ {
+  "source": "Rename it from its folder",
+  "plural": false
+ },
+ {
+  "source": "Rename…",
+  "plural": false
+ },
+ {
+  "source": "Replace",
+  "plural": false
+ },
+ {
+  "source": "Replacing moves it to the trash.",
+  "plural": false
+ },
+ {
+  "source": "Restore",
+  "plural": false
+ },
+ {
+  "source": "Restore %n Items",
+  "plural": true
+ },
+ {
+  "source": "Restore it first to open it",
+  "plural": false
+ },
+ {
+  "source": "Restoring",
+  "plural": false
+ },
+ {
+  "source": "Scroll text",
+  "plural": false
+ },
+ {
+  "source": "Search %1 and below",
+  "plural": false
+ },
+ {
+  "source": "Search this folder and below",
+  "plural": false
+ },
+ {
+  "source": "Searching…",
+  "plural": false
+ },
+ {
+  "source": "Select a range",
+  "plural": false
+ },
+ {
+  "source": "Select everything",
+  "plural": false
+ },
+ {
+  "source": "Select with a rectangle (Alt adds)",
+  "plural": false
+ },
+ {
+  "source": "Sending to %1…",
+  "plural": false
+ },
+ {
+  "source": "Sending with Taildrop needs tailscale, which isn't installed.",
+  "plural": false
+ },
+ {
+  "source": "Sent to %1",
+  "plural": false
+ },
+ {
+  "source": "Set Default",
+  "plural": false
+ },
+ {
+  "source": "Share",
+  "plural": false
+ },
+ {
+  "source": "Sharing nearby needs LocalSend, which isn't installed.",
+  "plural": false
+ },
+ {
+  "source": "Show hidden files",
+  "plural": false
+ },
+ {
+  "source": "Show Hidden Files",
+  "plural": false
+ },
+ {
+  "source": "Show hidden files (Ctrl+H)",
+  "plural": false
+ },
+ {
+  "source": "Show or hide the details pane",
+  "plural": false
+ },
+ {
+  "source": "Show these shortcuts",
+  "plural": false
+ },
+ {
+  "source": "Sign in",
+  "plural": false
+ },
+ {
+  "source": "Size",
+  "plural": false
+ },
+ {
+  "source": "Skip",
+  "plural": false
+ },
+ {
+  "source": "Something went wrong.",
+  "plural": false
+ },
+ {
+  "source": "Sort: name, kind, newest, oldest, size",
+  "plural": false
+ },
+ {
+  "source": "Sorted by kind (S)",
+  "plural": false
+ },
+ {
+  "source": "Sorted by name (S)",
+  "plural": false
+ },
+ {
+  "source": "Split into two panes / close the right one",
+  "plural": false
+ },
+ {
+  "source": "Still connecting to another machine",
+  "plural": false
+ },
+ {
+  "source": "stopped",
+  "plural": false
+ },
+ {
+  "source": "syncing",
+  "plural": false
+ },
+ {
+  "source": "Taildrop",
+  "plural": false
+ },
+ {
+  "source": "Tailnet",
+  "plural": false
+ },
+ {
+  "source": "Templates",
+  "plural": false
+ },
+ {
+  "source": "That name is taken",
+  "plural": false
+ },
+ {
+  "source": "That password didn't work. Try again.",
+  "plural": false
+ },
+ {
+  "source": "The application couldn't be started.",
+  "plural": false
+ },
+ {
+  "source": "The default couldn't be changed: %1",
+  "plural": false
+ },
+ {
+  "source": "The drive couldn't be mounted.",
+  "plural": false
+ },
+ {
+  "source": "The drive is busy",
+  "plural": false
+ },
+ {
+  "source": "There's already a file with this name in %1.",
+  "plural": false
+ },
+ {
+  "source": "There's already a folder with this name in %1.",
+  "plural": false
+ },
+ {
+  "source": "There's no folder %1",
+  "plural": false
+ },
+ {
+  "source": "This folder no longer exists.",
+  "plural": false
+ },
+ {
+  "source": "This is not a folder.",
+  "plural": false
+ },
+ {
+  "source": "Trash",
+  "plural": false
+ },
+ {
+  "source": "Type a path (Tab completes)",
+  "plural": false
+ },
+ {
+  "source": "Undo %1",
+  "plural": false
+ },
+ {
+  "source": "Undo / redo",
+  "plural": false
+ },
+ {
+  "source": "Unpin",
+  "plural": false
+ },
+ {
+  "source": "Unpinned %1",
+  "plural": false
+ },
+ {
+  "source": "User",
+  "plural": false
+ },
+ {
+  "source": "Videos",
+  "plural": false
+ },
+ {
+  "source": "Views",
+  "plural": false
+ },
+ {
+  "source": "Working",
+  "plural": false
+ },
+ {
+  "source": "You can remove %1 now",
+  "plural": false
+ },
+ {
+  "source": "You don't have permission to open this folder.",
+  "plural": false
+ },
+ {
+  "source": "Zoom in, out, fit",
+  "plural": false
+ }
+]
