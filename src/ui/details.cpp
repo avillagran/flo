@@ -1,5 +1,8 @@
 #include "ui/details.h"
 
+#include "core/settings.h"
+#include "core/shortcuts.h"
+
 #include "core/fsutil.h"
 #include "core/trash.h"
 #include "ui/app.h"
@@ -27,6 +30,14 @@
 #include <cstring>
 
 namespace flo::ui {
+
+namespace {
+// "Rename · F2" in the active shortcut profile, or just "Rename".
+std::string with_key(const std::string &text, Cmd c) {
+    const std::string k = primary_chord(App::get().settings().shortcuts, c);
+    return k.empty() ? text : text + " \xC2\xB7 " + k;
+}
+} // namespace
 
 namespace {
 const int kPad = 28;
@@ -178,18 +189,22 @@ void DetailsPane::buttons(std::vector<Btn> &out) const {
         if (App::get().sizes().pending(path_))
             label = fo::tr("Calculating\xE2\x80\xA6");
         else if (App::get().sizes().get(path_))
-            label = std::string(fo::tr("Recalculate")) + " \xC2\xB7 Ctrl+Space";
+            label = with_key(fo::tr("Recalculate"), Cmd::SizeFocused);
         else
-            label = std::string(fo::tr("Calculate")) + " \xC2\xB7 Ctrl+Space";
+            label = with_key(fo::tr("Calculate"), Cmd::SizeFocused);
         out.push_back({x0 + 16, title_y + 130, iw - 32, 30, "calculator", label, false, Act::Measure});
     }
-    out.push_back({x0 + 16, bottom - 136, iw - 32, 30, "edit", std::string(fo::tr("Rename")) + " \xC2\xB7 F2", false, Act::Rename});
+    out.push_back({x0 + 16, bottom - 136, iw - 32, 30, "edit", with_key(fo::tr("Rename"), Cmd::Rename), false, Act::Rename});
     int half = (iw - 40) / 2;
     out.push_back({x0 + 16, bottom - 94, half, 34, "", trashed_ ? fo::tr("Restore") : fo::tr("Open"), true, Act::Open});
     out.push_back({x0 + 24 + half, bottom - 94, half, 34, "image", fo::tr("Preview"), false, Act::Preview});
     out.push_back({x0 + 16, bottom - 52, 60, 34, "link", "", false, Act::CopyPath});
-    out.push_back({x0 + 80, bottom - 52, 68, 34, "copy", "F5", false, Act::Copy});
-    out.push_back({x0 + 152, bottom - 52, 68, 34, "arrow-right", "F6", false, Act::Move});
+    // Files' profile keys; Nautilus has none for these, so they say what they do.
+    const ShortcutProfile prof = App::get().settings().shortcuts;
+    const std::string copy_key = function_key(prof, Cmd::CopyFiles), move_key = function_key(prof, Cmd::MoveFiles);
+    out.push_back({x0 + 80, bottom - 52, 68, 34, "copy", copy_key.empty() ? fo::tr("Copy") : copy_key, false, Act::Copy});
+    out.push_back({x0 + 152, bottom - 52, 68, 34, "arrow-right", move_key.empty() ? fo::tr("Move") : move_key, false,
+                   Act::Move});
 }
 
 int DetailsPane::handle(int event) {

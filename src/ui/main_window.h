@@ -8,6 +8,7 @@
 
 #include "core/path_completion.h"
 #include "core/places.h"
+#include "core/shortcuts.h"
 #include "core/session.h"
 
 #include "fltk-omarchy/anim.h"
@@ -33,6 +34,10 @@ namespace flo::ui {
 
 class Pane;
 class DetailsPane;
+
+// Files' shortcut profiles: menu accelerators written with Files' chords,
+// printed as the active profile binds the same commands.
+void remap_menu_keys(std::vector<fo::MenuItem> &items);
 
 class MainWindow : public fo::Window {
 public:
@@ -62,6 +67,15 @@ public:
     void close_tabs_right(int i);
     void reopen_tab();
     void select_tab(int i);
+    // Files' shortcut profiles: the active profile's chords for a command
+    // (all of them, "F1 / Ctrl+?", or the first), for menus and the help.
+    std::string keys(Cmd c) const;
+    std::string key(Cmd c) const;
+    // Switches the profile for every window (saved with the settings).
+    void set_shortcut_profile(ShortcutProfile p);
+    // The profile changed: the window keys and what prints them follow.
+    void shortcuts_changed();
+
     // Files: moves tab `from` to position `to` (Ctrl+Shift+PgUp/PgDn, drag).
     void move_tab(int from, int to);
 
@@ -132,6 +146,7 @@ private:
     void set_field_text(const std::string &text);
     void show_completion(const std::string &notice);
     void build_shortcuts();
+    void toggle_rail_pin();
     void update_header();
     void update_tabs();
     void layout();

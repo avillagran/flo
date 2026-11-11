@@ -166,6 +166,11 @@ void App::window_closed(MainWindow *w) {
     Fl::delete_widget(w);
 }
 
+void App::shortcuts_changed() {
+    for (MainWindow *w : windows_)
+        w->shortcuts_changed();
+}
+
 void App::save_settings() { settings_.save(); }
 
 void App::trim_soon() {

@@ -7,6 +7,7 @@
 #include "core/network.h"
 #include "core/places.h"
 #include "core/recents.h"
+#include "core/shortcuts.h"
 #include "core/starred.h"
 #include "core/trash.h"
 #include "core/uri.h"
@@ -1491,7 +1492,9 @@ void Pane::menu_from_keyboard() {
 
 void Pane::context_menu(int index, int x, int y, FolderModel *where, const std::string &folder) {
     win_->set_active(this);
-    fo::PopupMenu::open_at(win_, x, y, menu_for(index, where, folder));
+    std::vector<fo::MenuItem> m = menu_for(index, where, folder);
+    remap_menu_keys(m);
+    fo::PopupMenu::open_at(win_, x, y, m);
 }
 
 std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const std::string &folder_in) {
@@ -2130,7 +2133,8 @@ void Pane::zoom_by(double factor) {
 
 void Pane::zoom_step(int step) {
     if (view_ != View::Grid || dual_) {
-        fo::Toast::show(win_, fo::tr("Zoom only exists in the Grid view (Ctrl+5)"), 2.5, fo::Toast::Error);
+        fo::Toast::show(win_, fo::i18n::arg(fo::tr("Zoom only exists in the Grid view (%1)"),
+                                              primary_chord(App::get().settings().shortcuts, Cmd::ViewGrid)), 2.5, fo::Toast::Error);
         return;
     }
     if (step == 0)
@@ -2239,6 +2243,17 @@ void Pane::mark_and_advance() {
     }
 }
 
+void Pane::toggle_mark() {
+    FileView *v = files();
+    int c = v->current();
+    if (c < 0) {
+        if (model_.count() > 0)
+            v->set_current(0, false);
+        return;
+    }
+    v->select(c, !v->selected(c));
+}
+
 void Pane::new_file() {
     if (in_trash() || in_recents())
         return;
@@ -2246,17 +2261,9 @@ void Pane::new_file() {
                                  [this](bool ok, const std::string &name) {
                                      if (!ok)
                                          return;
-                                     std::string p = path_join(folder_, name);
-                                     // Never overwrites: the name must be free.
-                                     int fd = ::open(p.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC,
-                                                     0644);
-                                     if (fd < 0) {
-                                         show_message(fo::i18n::arg(fo::tr("%1 can't be created."), quoted(name)));
-                                         return;
-                                     }
-                                     ::close(fd);
-                                     pending_select_ = name;
-                                     reload(false);
+                                     // Files: the worker creates it exclusively and
+                                     // records it, so Ctrl+Z sends it to the trash.
+                                     ops_->new_file(folder_, name);
                                  },
                                  0, 8);
     d->on_validate([d, this](const std::string &s) {

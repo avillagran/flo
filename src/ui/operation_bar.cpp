@@ -1,5 +1,9 @@
 #include "ui/operation_bar.h"
 
+#include "core/settings.h"
+#include "core/shortcuts.h"
+#include "ui/app.h"
+
 #include "fltk-omarchy/i18n.h"
 #include "fltk-omarchy/icons.h"
 #include "fltk-omarchy/paint.h"
@@ -12,18 +16,20 @@ namespace flo::ui {
 
 namespace {
 struct Item {
-    const char *key, *icon, *text, *tip;
+    Cmd cmd;
+    const char *icon, *text, *tip;
 };
-// Files' ITEMS: key, icon, short text, accessible name.
+// Files' ITEMS: command (its key follows the profile), icon, short text,
+// accessible name.
 const Item kItems[OperationBar::kButtons] = {
-    {"F1", "help", "Help", "Help and shortcuts"},
-    {"F2", "pencil", "Rename", "Rename the selection"},
-    {"F3", "eye", "Preview", "Preview the focused item"},
-    {"F5", "copy", "Copy", "Copy the selection: review the destination"},
-    {"F6", "arrow-right", "Move", "Move the selection: review the destination"},
-    {"F7", "folder-plus", "Folder", "Create a folder"},
-    {"F8", "trash", "Trash", "Send the selection to the trash"},
-    {"F10", "zap", "Actions", "Actions on files"},
+    {Cmd::Help, "help", "Help", "Help and shortcuts"},
+    {Cmd::Rename, "pencil", "Rename", "Rename the selection"},
+    {Cmd::Preview, "eye", "Preview", "Preview the focused item"},
+    {Cmd::CopyFiles, "copy", "Copy", "Copy the selection: review the destination"},
+    {Cmd::MoveFiles, "arrow-right", "Move", "Move the selection: review the destination"},
+    {Cmd::NewFolder, "folder-plus", "Folder", "Create a folder"},
+    {Cmd::Trash, "trash", "Trash", "Send the selection to the trash"},
+    {Cmd::Actions, "zap", "Actions", "Actions on files"},
 };
 } // namespace
 
@@ -53,9 +59,14 @@ void OperationBar::draw() {
         // Files: "F5 icon Copy" from 960 px, "F5 Copy" from 720, else "F5 icon".
         const int W = w();
         int tx = ax + 6;
-        fo::text::draw(kItems[i].key, tx, ay, aw - 12, ah, fg, fo::text::REGULAR, 11, FL_ALIGN_LEFT,
-                       fo::text::Elide::None);
-        tx += int(fo::text::width(kItems[i].key, fo::text::REGULAR, 11)) + 6;
+        // Files: the button's function key in the profile (MC style), else
+        // its first chord, else none.
+        const std::string key = function_key(App::get().settings().shortcuts, kItems[i].cmd);
+        if (!key.empty()) {
+            fo::text::draw(key, tx, ay, aw - 12, ah, fg, fo::text::REGULAR, 11, FL_ALIGN_LEFT,
+                           fo::text::Elide::None);
+            tx += int(fo::text::width(key, fo::text::REGULAR, 11)) + 6;
+        }
         if (W >= 960 || W < 720) {
             fo::icon::draw(icon, tx, ay + 9, 12, fg);
             tx += 18;

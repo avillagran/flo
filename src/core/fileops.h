@@ -27,7 +27,7 @@
 namespace flo {
 
 enum class OpKind {
-    Copy, Move, Rename, Duplicate, NewFolder, Compress, Extract,
+    Copy, Move, Rename, Duplicate, NewFolder, NewFile, Compress, Extract,
     Trash, Restore, DeletePermanently, EmptyTrash, Undo, Redo
 };
 const char *op_kind_name(OpKind k);
@@ -94,6 +94,10 @@ public:
     uint64_t rename(std::string path, std::string new_name);
     // "New Folder", "New Folder 2", ... unless a name is given.
     uint64_t new_folder(std::string folder, std::string name = {});
+    // Files' New file (Ctrl+N): an empty file created exclusively (never
+    // replacing anything, never through a link), recorded for undo: undo
+    // sends it to the trash while it is still empty and untouched since.
+    uint64_t new_file(std::string folder, std::string name);
     // A zip beside the items (one item: "name.zip", several: "Archive.zip").
     uint64_t compress(std::vector<std::string> paths);
     // Extracts beside the archive: a single top-level item lands as itself,

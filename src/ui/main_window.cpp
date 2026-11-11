@@ -2,6 +2,7 @@
 
 #include "core/fsutil.h"
 #include "core/path_completion.h"
+#include "core/shortcuts.h"
 #include "core/settings.h"
 #include "core/tree_size.h"
 #include "core/xdg.h"
@@ -163,6 +164,7 @@ MainWindow::MainWindow(int W, int H, const std::string &folder, const std::strin
         m.push_back(fo::MenuItem(fo::tr("New tab"), "Ctrl+T", [this] { new_tab(active_pane()->folder()); }));
         m.push_back(fo::MenuItem(fo::tr("Reopen closed tab"), "Ctrl+Shift+T", [this] { reopen_tab(); })
                         .disabled(closed_tabs_.empty()));
+        remap_menu_keys(m);
         fo::PopupMenu::open_at(this, x, y, m);
     });
     status_->on_hint([this] { edit_path(); });
@@ -695,9 +697,9 @@ void MainWindow::update_header() {
     if (!p)
         return;
     nav_->items({
-        {"arrow-left", fo::tr("Back"), "Alt+Left", false, p->can_back(), [this] { active_pane()->back(); }},
-        {"arrow-right", fo::tr("Forward"), "Alt+Right", false, p->can_forward(), [this] { active_pane()->forward(); }},
-        {"arrow-up", fo::tr("Up"), "Backspace", false, p->can_go_up(), [this] { active_pane()->go_up(); }},
+        {"arrow-left", fo::tr("Back"), key(Cmd::Back), false, p->can_back(), [this] { active_pane()->back(); }},
+        {"arrow-right", fo::tr("Forward"), key(Cmd::Forward), false, p->can_forward(), [this] { active_pane()->forward(); }},
+        {"arrow-up", fo::tr("Up"), key(Cmd::Parent), false, p->can_go_up(), [this] { active_pane()->go_up(); }},
     });
     using V = Pane::View;
     auto view = [this](V v) {
@@ -709,7 +711,7 @@ void MainWindow::update_header() {
     V v = p->view();
     bool filtered = !p->filter().empty();
     std::vector<fo::ToolBar::Item> items = {
-        {filtered ? "x" : "search", filtered ? fo::tr("Clear filter") : fo::tr("Search"), filtered ? "Esc" : "Ctrl+F",
+        {filtered ? "x" : "search", filtered ? fo::tr("Clear filter") : fo::tr("Search"), filtered ? std::string("Esc") : key(Cmd::Filter),
          filtered || field_mode_ == Field::Filter, true,
          [this, filtered] {
              if (filtered) {
@@ -719,30 +721,31 @@ void MainWindow::update_header() {
                  begin_filter();
              }
          }},
-        {"pencil", fo::tr("Edit path"), "Ctrl+L", false, true, [this] { edit_path(); }},
+        {"pencil", fo::tr("Edit path"), key(Cmd::Location), false, true, [this] { edit_path(); }},
     };
     if (w() < 640) {
         items.push_back({"groups", fo::tr("Views"), "", false, true, [this] {
                              std::vector<fo::MenuItem> m;
                              const char *names[] = {"Groups", "List", "Columns", "Space", "Grid"};
-                             const char *keys[] = {"Ctrl+1", "Ctrl+2", "Ctrl+3", "Ctrl+4", "Ctrl+5"};
+                             const Cmd cmds[] = {Cmd::ViewGroups, Cmd::ViewList, Cmd::ViewColumns, Cmd::ViewSpace,
+                                                 Cmd::ViewGrid};
                              for (int k = 0; k < 5; ++k)
-                                 m.push_back(fo::MenuItem(fo::tr(names[k]), keys[k], [this, k] {
+                                 m.push_back(fo::MenuItem(fo::tr(names[k]), primary_chord(ShortcutProfile::Files, cmds[k]), [this, k] {
                                                  active_pane()->set_view(V(k));
                                              }).check(active_pane()->view() == V(k)));
                              open_menu_under(2, m);
                          }});
     } else {
-        items.push_back({"groups", fo::tr("Groups"), "Ctrl+1", v == V::Groups, true, view(V::Groups)});
-        items.push_back({"list", fo::tr("List"), "Ctrl+2", v == V::List, true, view(V::List)});
-        items.push_back({"grid", fo::tr("Grid"), "Ctrl+5", v == V::Grid, true, view(V::Grid)});
-        items.push_back({"space", fo::tr("Space"), "Ctrl+4", v == V::Space, true, view(V::Space)});
-        items.push_back({"columns", fo::tr("Columns"), "Ctrl+3", v == V::Columns, true, view(V::Columns)});
-        items.push_back({"info", fo::tr("Inspector"), "Ctrl+Alt+I", details_on_ || dual_, true,
+        items.push_back({"groups", fo::tr("Groups"), key(Cmd::ViewGroups), v == V::Groups, true, view(V::Groups)});
+        items.push_back({"list", fo::tr("List"), key(Cmd::ViewList), v == V::List, true, view(V::List)});
+        items.push_back({"grid", fo::tr("Grid"), key(Cmd::ViewGrid), v == V::Grid, true, view(V::Grid)});
+        items.push_back({"space", fo::tr("Space"), key(Cmd::ViewSpace), v == V::Space, true, view(V::Space)});
+        items.push_back({"columns", fo::tr("Columns"), key(Cmd::ViewColumns), v == V::Columns, true, view(V::Columns)});
+        items.push_back({"info", fo::tr("Inspector"), key(Cmd::Inspector), details_on_ || dual_, true,
                          [this] { toggle_details(); }});
     }
-    items.push_back({"actions", fo::tr("Actions"), "F10", false, true, [this] { actions_menu(); }});
-    items.push_back({"settings", fo::tr("Preferences"), "Ctrl+,", false, true, [this] { preferences_menu(); }});
+    items.push_back({"actions", fo::tr("Actions"), key(Cmd::Actions), false, true, [this] { actions_menu(); }});
+    items.push_back({"settings", fo::tr("Preferences"), key(Cmd::Settings), false, true, [this] { preferences_menu(); }});
     tools_->items(items);
     std::vector<fo::Breadcrumbs::Segment> segs;
     for (const auto &c : p->crumbs())
@@ -981,8 +984,11 @@ void MainWindow::run_omnibar(const std::string &text) {
                     cmds.push_back({it.label, it.shortcut, it.icon, it.action, it.enabled});
             }
         };
-        add(actions_items(), add);
-        add(preferences_items(), add);
+        std::vector<fo::MenuItem> actions = actions_items(), prefs = preferences_items();
+        remap_menu_keys(actions);
+        remap_menu_keys(prefs);
+        add(actions, add);
+        add(prefs, add);
         CommandPalette::open(this, fo::tr("Commands"), fo::tr("Search command or shortcut\xE2\x80\xA6"), cmds, q);
         return;
     }
@@ -1007,10 +1013,21 @@ void MainWindow::run_omnibar(const std::string &text) {
 
 // --- Menus --------------------------------------------------------------------------
 
+void remap_menu_keys(std::vector<fo::MenuItem> &items) {
+    const ShortcutProfile p = App::get().settings().shortcuts;
+    if (p == ShortcutProfile::Files)
+        return;
+    for (auto &it : items) {
+        it.shortcut = remap_chord(p, it.shortcut);
+        remap_menu_keys(it.submenu);
+    }
+}
+
 void MainWindow::open_menu_under(int item, std::vector<fo::MenuItem> items) {
     int x, y, w, h;
     if (!tools_->item_rect(item, x, y, w, h))
         return;
+    remap_menu_keys(items);
     fo::PopupMenu::open_below(this, x, y, w, h, std::move(items), true);
 }
 
@@ -1158,6 +1175,13 @@ std::vector<fo::MenuItem> MainWindow::preferences_items() {
         MenuItem(dual_ ? fo::tr("Save only this group") : fo::tr("Save session"), "",
                  [this] { App::get().save_session(this); })
             .with_icon("save"),
+        // Files: the two shortcut profiles, applied live to every window.
+        MenuItem(fo::tr("Shortcuts: Files"), "", [this] { set_shortcut_profile(ShortcutProfile::Files); })
+            .with_icon("keyboard")
+            .check(s.shortcuts == ShortcutProfile::Files),
+        MenuItem(fo::tr("Shortcuts: Nautilus"), "", [this] { set_shortcut_profile(ShortcutProfile::Nautilus); })
+            .with_icon("keyboard")
+            .check(s.shortcuts == ShortcutProfile::Nautilus),
         MenuItem(fo::tr("Shortcut help"), "F1", [this] { show_help(); }).with_icon("help"),
         MenuItem(fo::tr("Commands"), "Ctrl+Shift+P", [this] { commands(); }).with_icon("terminal"),
     };
@@ -1300,6 +1324,7 @@ void MainWindow::sidebar_context(const fo::SidebarRow &r, int x, int y) {
             });
         }));
     }
+    remap_menu_keys(m);
     fo::PopupMenu::open_at(this, x, y, m);
 }
 
@@ -1352,160 +1377,215 @@ bool MainWindow::intercept(int event) {
 // --- Keys ---------------------------------------------------------------------------
 
 void MainWindow::show_help() {
-    fo::HelpOverlay::show(
-        this, {
-                  {fo::tr("Type"), fo::tr("Filter this folder (Esc clears)")},
-                  {"Ctrl+F", fo::tr("Edit the filter")},
-                  {"Ctrl+L", fo::tr("Edit the path; >command or :place opens a catalog")},
-                  {"Ctrl+Shift+P", fo::tr("Commands")},
-                  {"Ctrl+Shift+F", fo::tr("Search in subfolders")},
-                  {"Enter", fo::tr("Open")},
-                  {"Backspace / Alt+Up", fo::tr("Go to the parent folder")},
-                  {"Alt+Left / Alt+Right", fo::tr("Back / forward")},
-                  {"Alt+Home", fo::tr("Go home")},
-                  {"Ctrl+1 \xE2\x80\xA6 5", fo::tr("Groups, List, Columns, Space, Grid")},
-                  {"Ctrl++ / Ctrl+- / Ctrl+0", fo::tr("Zoom the Grid in / out / reset")},
-                  {"Space / F3", fo::tr("Preview")},
-                  {"Ctrl+A / Ctrl+I", fo::tr("Select all / invert the selection")},
-                  {"Insert", fo::tr("Mark and move on")},
-                  {"Ctrl+Shift+D", fo::tr("Clear the selection")},
-                  {"F2", fo::tr("Rename")},
-                  {"F5 / F6", fo::tr("Copy / move (to the other pane)")},
-                  {"F7 / Ctrl+Shift+N", fo::tr("New folder")},
-                  {"Ctrl+N", fo::tr("New file")},
-                  {"Delete / F8", fo::tr("Move to the trash")},
-                  {"Ctrl+C / X / V", fo::tr("Copy, cut, paste files")},
-                  {"Ctrl+Alt+C", fo::tr("Copy the path")},
-                  {"Ctrl+Z / Ctrl+Shift+Z", fo::tr("Undo / redo")},
-                  {"Ctrl+T / Ctrl+W", fo::tr("New tab / close tab")},
-                  {"Ctrl+Tab / Ctrl+Shift+T", fo::tr("Next tab / reopen a closed tab")},
-                  {"F9 / Tab", fo::tr("Dual pane / switch pane")},
-                  {"Ctrl+Space", fo::tr("Calculate the folder's size")},
-                  {"Ctrl+H", fo::tr("Show hidden files")},
-                  {"Ctrl+D", fo::tr("Pin the folder")},
-                  {"Ctrl+Alt+D", fo::tr("Favorites and places")},
-                  {"Ctrl+E / Ctrl+Alt+E", fo::tr("Star / open Starred")},
-                  {"Ctrl+Alt+I", fo::tr("Inspector")},
-                  {"Alt+Enter", fo::tr("Properties and permissions")},
-                  {"Ctrl+Alt+B", fo::tr("MC operation bar")},
-                  {"Ctrl+Shift+PgUp / PgDn", fo::tr("Move the active tab left/right")},
-                  {"F10 / Ctrl+,", fo::tr("Actions / Preferences")},
-                  {"Ctrl+R", fo::tr("Reload")},
-                  {"Menu / Shift+F10", fo::tr("Context menu")},
-                  {"F1", fo::tr("Show these shortcuts")},
-              });
+    // Files' help prints the active profile's chords; rows whose commands
+    // have none in it are left out.
+    // Two commands' first chords; "Ctrl+Shift+PgUp / PgDn" when they share
+    // two modifiers.
+    auto both = [this](Cmd a, Cmd b) {
+        std::string x = key(a), y = key(b);
+        if (x.empty() || y.empty())
+            return x.empty() ? y : x;
+        size_t cut = x.rfind('+');
+        if (cut != std::string::npos && std::count(x.begin(), x.begin() + long(cut), '+') >= 1 &&
+            y.compare(0, cut + 1, x, 0, cut + 1) == 0 && y.find('+', cut + 1) == std::string::npos)
+            y = y.substr(cut + 1);
+        return x + " / " + y;
+    };
+    const bool nautilus = App::get().settings().shortcuts == ShortcutProfile::Nautilus;
+    // The five views in the profile's key order (Nautilus: List, Grid,
+    // Groups, Columns, Space), "Ctrl+1 … 5" when they run in sequence.
+    auto views = [this, nautilus] {
+        const Cmd order_files[] = {Cmd::ViewGroups, Cmd::ViewList, Cmd::ViewColumns, Cmd::ViewSpace, Cmd::ViewGrid};
+        const Cmd order_nautilus[] = {Cmd::ViewList, Cmd::ViewGrid, Cmd::ViewGroups, Cmd::ViewColumns, Cmd::ViewSpace};
+        const Cmd *order = nautilus ? order_nautilus : order_files;
+        bool sequence = true;
+        std::string out;
+        for (int i = 0; i < 5; ++i) {
+            std::string k = key(order[i]);
+            sequence = sequence && k == "Ctrl+" + std::to_string(i + 1);
+            out += (out.empty() ? "" : " \xC2\xB7 ") + k;
+        }
+        return sequence ? std::string("Ctrl+1 \xE2\x80\xA6 5") : out;
+    };
+    std::vector<std::pair<std::string, std::string>> rows = {
+        {fo::tr("Profile"), nautilus ? fo::tr("Shortcuts: Nautilus") : fo::tr("Shortcuts: Files")},
+        {fo::tr("Type"), fo::tr("Filter this folder (Esc clears)")},
+        {keys(Cmd::Filter), fo::tr("Edit the filter")},
+        {keys(Cmd::Location), fo::tr("Edit the path; >command or :place opens a catalog")},
+        {keys(Cmd::Commands), fo::tr("Commands")},
+        {keys(Cmd::Search), fo::tr("Search in subfolders")},
+        {keys(Cmd::Open), fo::tr("Open")},
+        {keys(Cmd::Parent), fo::tr("Go to the parent folder")},
+        {both(Cmd::Back, Cmd::Forward), fo::tr("Back / forward")},
+        {keys(Cmd::Home), fo::tr("Go home")},
+        {views(), nautilus ? fo::tr("List, Grid, Groups, Columns, Space") : fo::tr("Groups, List, Columns, Space, Grid")},
+        {key(Cmd::ZoomIn) + " / " + key(Cmd::ZoomOut) + " / " + key(Cmd::ZoomReset),
+         fo::tr("Zoom the Grid in / out / reset")},
+        {keys(Cmd::Preview), fo::tr("Preview")},
+        {both(Cmd::SelectAll, Cmd::InvertSelection), fo::tr("Select all / invert the selection")},
+        {keys(Cmd::MarkAdvance), fo::tr("Mark and move on")},
+        {keys(Cmd::MarkToggle), fo::tr("Mark without moving")},
+        {keys(Cmd::ClearSelection), fo::tr("Clear the selection")},
+        {keys(Cmd::Rename), fo::tr("Rename")},
+        {both(Cmd::CopyFiles, Cmd::MoveFiles), fo::tr("Copy / move (to the other pane)")},
+        {keys(Cmd::NewFolder), fo::tr("New folder")},
+        {keys(Cmd::NewFile), fo::tr("New file")},
+        {keys(Cmd::NewWindow), fo::tr("New window")},
+        {keys(Cmd::Trash), fo::tr("Move to the trash")},
+        {"Ctrl+C / X / V", fo::tr("Copy, cut, paste files")},
+        {keys(Cmd::CopyPath), fo::tr("Copy the path")},
+        {both(Cmd::Undo, Cmd::Redo), fo::tr("Undo / redo")},
+        {both(Cmd::TabNew, Cmd::TabClose), fo::tr("New tab / close tab")},
+        {both(Cmd::TabNext, Cmd::TabReopen), fo::tr("Next tab / reopen a closed tab")},
+        {both(Cmd::TabMoveLeft, Cmd::TabMoveRight), fo::tr("Move the active tab left/right")},
+        {keys(Cmd::DualPane) + " / Tab", fo::tr("Dual pane / switch pane")},
+        {keys(Cmd::FocusCycle), fo::tr("Switch pane, or the sidebar and the list")},
+        {keys(Cmd::RailToggle), fo::tr("Keep the sidebar open")},
+        {keys(Cmd::SizeFocused), fo::tr("Calculate the folder's size")},
+        {keys(Cmd::Hidden), fo::tr("Show hidden files")},
+        {keys(Cmd::BookmarkAdd), fo::tr("Pin the folder")},
+        {keys(Cmd::Bookmarks), fo::tr("Favorites and places")},
+        {both(Cmd::StarToggle, Cmd::GoStarred), fo::tr("Star / open Starred")},
+        {keys(Cmd::Inspector), fo::tr("Inspector")},
+        {keys(Cmd::Properties), fo::tr("Properties and permissions")},
+        {keys(Cmd::OperationBar), fo::tr("MC operation bar")},
+        {both(Cmd::Actions, Cmd::Settings), fo::tr("Actions / Preferences")},
+        {keys(Cmd::Refresh), fo::tr("Reload")},
+        {keys(Cmd::ContextMenu), fo::tr("Context menu")},
+        {keys(Cmd::Help), fo::tr("Show these shortcuts")},
+    };
+    std::vector<std::pair<std::string, std::string>> shown;
+    for (auto &r : rows)
+        if (!r.first.empty())
+            shown.push_back(std::move(r));
+    fo::HelpOverlay::show(this, shown);
 }
 
 void MainWindow::build_shortcuts() {
+    for (const std::string &spec : shortcut_specs())
+        remove_shortcut(spec);
+    const ShortcutProfile profile = App::get().settings().shortcuts;
     auto P = [this] { return active_pane(); };
-    auto on = [this](const char *spec, std::function<void()> fn) { shortcut(spec, std::move(fn)); };
+    // Files' table (core/shortcuts.h): every chord of the active profile,
+    // plus its unprinted layout variants. "Enter" stays with the views.
+    auto bind = [this, profile](Cmd c, std::function<void()> fn) {
+        std::vector<std::string> specs = chords(profile, c);
+        for (const auto &a : aliases(profile, c))
+            specs.push_back(a);
+        for (const auto &spec : specs)
+            if (spec != "Enter")
+                shortcut(spec, fn);
+    };
     using V = Pane::View;
-    // Files' default shortcut profile (crates/ui/src/shortcuts.rs).
-    on("Ctrl+1", [P] { P()->set_view(V::Groups); });
-    on("Ctrl+2", [P] { P()->set_view(V::List); });
-    on("Ctrl+3", [P] { P()->set_view(V::Columns); });
-    on("Ctrl+4", [P] { P()->set_view(V::Space); });
-    on("Ctrl+5", [P] { P()->set_view(V::Grid); });
-    on("Ctrl++", [P] { P()->zoom_step(1); });
-    on("Ctrl+=", [P] { P()->zoom_step(1); });
-    on("Ctrl+-", [P] { P()->zoom_step(-1); });
-    on("Ctrl+0", [P] { P()->zoom_step(0); });
-    on("Ctrl+Shift+P", [this] { commands(); });
-    on("F1", [this] { show_help(); });
-    on("Ctrl+?", [this] { show_help(); });
-    on("Ctrl+T", [this] { new_tab(active_pane()->in_recents() ? xdg::home() : active_pane()->folder()); });
-    on("Ctrl+W", [this] { defer([this] { close_tab(tab_); }); });
-    on("Ctrl+Shift+T", [this] { reopen_tab(); });
-    on("Ctrl+Tab", [this] { select_tab((tab_ + 1) % int(tabs_.size())); });
-    on("Ctrl+PageDown", [this] { select_tab((tab_ + 1) % int(tabs_.size())); });
-    on("Ctrl+Shift+PageUp", [this] { move_tab(tab_, tab_ - 1); });
-    on("Ctrl+Shift+PageDown", [this] { move_tab(tab_, tab_ + 1); });
-    on("Ctrl+Shift+Tab", [this] { select_tab((tab_ + int(tabs_.size()) - 1) % int(tabs_.size())); });
-    on("Ctrl+PageUp", [this] { select_tab((tab_ + int(tabs_.size()) - 1) % int(tabs_.size())); });
-    on("Ctrl+Alt+S", [this] { focus_sidebar(); });
+    bind(Cmd::ViewGroups, [P] { P()->set_view(V::Groups); });
+    bind(Cmd::ViewList, [P] { P()->set_view(V::List); });
+    bind(Cmd::ViewColumns, [P] { P()->set_view(V::Columns); });
+    bind(Cmd::ViewSpace, [P] { P()->set_view(V::Space); });
+    bind(Cmd::ViewGrid, [P] { P()->set_view(V::Grid); });
+    bind(Cmd::ZoomIn, [P] { P()->zoom_step(1); });
+    bind(Cmd::ZoomOut, [P] { P()->zoom_step(-1); });
+    bind(Cmd::ZoomReset, [P] { P()->zoom_step(0); });
+    bind(Cmd::Commands, [this] { commands(); });
+    bind(Cmd::Help, [this] { show_help(); });
+    bind(Cmd::TabNew, [this] { new_tab(active_pane()->in_recents() ? xdg::home() : active_pane()->folder()); });
+    bind(Cmd::TabClose, [this] { defer([this] { close_tab(tab_); }); });
+    bind(Cmd::TabReopen, [this] { reopen_tab(); });
+    bind(Cmd::TabNext, [this] { select_tab((tab_ + 1) % int(tabs_.size())); });
+    bind(Cmd::TabPrev, [this] { select_tab((tab_ + int(tabs_.size()) - 1) % int(tabs_.size())); });
+    bind(Cmd::TabMoveLeft, [this] { move_tab(tab_, tab_ - 1); });
+    bind(Cmd::TabMoveRight, [this] { move_tab(tab_, tab_ + 1); });
+    bind(Cmd::FocusRail, [this] { focus_sidebar(); });
+    // Nautilus' F6: the other pane of the dual view, else the rail and back.
+    bind(Cmd::FocusCycle, [this] { cycle_focus(false); });
+    // Nautilus' F9: the rail stays open, or not.
+    bind(Cmd::RailToggle, [this] { toggle_rail_pin(); });
     // Files: the favorites hub (favorites, XDG places and history, labels).
-    on("Ctrl+Alt+D", [this] { FavoritesHub::open(this, active_pane()); });
-    on("Ctrl+E", [P] { P()->toggle_star(); });
-    on("Ctrl+Alt+E", [P] { P()->navigate(kStarred); });
-    on("F9", [this] { toggle_dual(); });
-    on("Ctrl+Alt+B", [this] { toggle_operation_bar(); });
-    on("Ctrl+Shift+F", [this] { begin_search(); });
-    on("Ctrl+F", [this] { begin_filter(); });
-    on("Ctrl+Space", [P] { P()->measure_focused(); });
-    on("Ctrl+Shift+Space", [P] { P()->measure_listed(); });
-    on("Ctrl+D", [P] { P()->toggle_pin(); });
-    on("Insert", [P] { P()->mark_and_advance(); });
-    on("Ctrl+Shift+O", [P] { P()->menu_from_keyboard(); });
-    on("Ctrl+.", [P] {
+    bind(Cmd::Bookmarks, [this] { FavoritesHub::open(this, active_pane()); });
+    bind(Cmd::StarToggle, [P] { P()->toggle_star(); });
+    bind(Cmd::GoStarred, [P] { P()->navigate(kStarred); });
+    bind(Cmd::DualPane, [this] { toggle_dual(); });
+    bind(Cmd::OperationBar, [this] { toggle_operation_bar(); });
+    bind(Cmd::Search, [this] { begin_search(); });
+    bind(Cmd::Filter, [this] { begin_filter(); });
+    bind(Cmd::SizeFocused, [P] { P()->measure_focused(); });
+    bind(Cmd::SizesListed, [P] { P()->measure_listed(); });
+    bind(Cmd::BookmarkAdd, [P] { P()->toggle_pin(); });
+    bind(Cmd::MarkAdvance, [P] { P()->mark_and_advance(); });
+    bind(Cmd::MarkToggle, [P] { P()->toggle_mark(); });
+    bind(Cmd::OpenWith, [P] { P()->menu_from_keyboard(); });
+    bind(Cmd::Terminal, [P] {
         if (!open_terminal(P()->folder()))
             P()->show_message(fo::tr("No terminal was found."));
     });
-    on("Ctrl+Alt+C", [P] { P()->copy_path(); });
-    on("Space", [P] { P()->preview(); });
-    on("F3", [P] { P()->preview(); });
-    on("Delete", [P] { P()->delete_selected(); });
-    on("F8", [P] { P()->delete_selected(); });
-    on("Shift+Delete", [P] {
+    bind(Cmd::CopyPath, [P] { P()->copy_path(); });
+    bind(Cmd::Preview, [P] { P()->preview(); });
+    bind(Cmd::Trash, [P] { P()->delete_selected(); });
+    bind(Cmd::DeletePermanently, [P] {
         if (P()->in_trash())
             P()->confirm_delete(P()->selected_paths());
         else
             P()->delete_selected();
     });
-    on("Alt+Down", [this] { crumbs_->open_fold(); });
-    on("Ctrl+Enter", [P, this] {
+    bind(Cmd::Breadcrumbs, [this] { crumbs_->open_fold(); });
+    // Nautilus' Alt+Down opens the focused item (Enter stays with the views).
+    bind(Cmd::Open, [P] {
+        if (P()->current() >= 0)
+            P()->open_path(P()->current_path());
+    });
+    bind(Cmd::OpenInTab, [P, this] {
         if (const Entry *e = P()->current_entry(); e && e->is_dir)
             new_tab(P()->current_path());
     });
-    on("Shift+Enter", [P, this] {
+    bind(Cmd::OpenInBackground, [P, this] {
         if (const Entry *e = P()->current_entry(); e && e->is_dir)
             new_tab(P()->current_path(), true);
     });
-    on("Alt+Left", [P] { P()->back(); });
-    on("Alt+Right", [P] { P()->forward(); });
-    on("Backspace", [P] { P()->go_up(); });
-    on("Alt+Up", [P] { P()->go_up(); });
-    on("Alt+Home", [P] { P()->go_home(); });
-    on("Alt+Enter", [P] { P()->show_properties(); });
-    on("Ctrl+C", [P] { P()->copy(false); });
-    on("Ctrl+X", [P] { P()->copy(true); });
-    on("Ctrl+V", [P] { P()->paste(); });
-    on("Ctrl+Shift+V", [P] { P()->paste(); });
-    on("Ctrl+H", [P] { P()->toggle_hidden(); });
-    on("Ctrl+R", [P] {
+    bind(Cmd::Back, [P] { P()->back(); });
+    bind(Cmd::Forward, [P] { P()->forward(); });
+    bind(Cmd::Parent, [P] { P()->go_up(); });
+    bind(Cmd::Home, [P] { P()->go_home(); });
+    bind(Cmd::Properties, [P] { P()->show_properties(); });
+    bind(Cmd::ClipboardCopy, [P] { P()->copy(false); });
+    bind(Cmd::ClipboardCut, [P] { P()->copy(true); });
+    bind(Cmd::ClipboardPaste, [P] { P()->paste(); });
+    bind(Cmd::NativePaste, [P] { P()->paste(); });
+    bind(Cmd::Hidden, [P] { P()->toggle_hidden(); });
+    bind(Cmd::Refresh, [P] {
         P()->reload(true);
         App::get().refresh_places();
     });
-    on("Menu", [P] { P()->menu_from_keyboard(); });
-    on("Shift+F10", [P] { P()->menu_from_keyboard(); });
-    on("Ctrl+Alt+I", [this] { toggle_details(); });
-    on("F10", [this] { actions_menu(); });
-    on("Ctrl+,", [this] { preferences_menu(); });
+    bind(Cmd::ContextMenu, [P] { P()->menu_from_keyboard(); });
+    bind(Cmd::Inspector, [this] { toggle_details(); });
+    bind(Cmd::Actions, [this] { actions_menu(); });
+    bind(Cmd::Settings, [this] { preferences_menu(); });
     // Files: F5 recalculates in the Space view, copies everywhere else.
-    on("F5", [P, this] {
+    bind(Cmd::CopyFiles, [P, this] {
         if (P()->view() == Pane::View::Space && !split())
             P()->measure_listed();
         else
             P()->transfer(false);
     });
-    on("F6", [P] { P()->transfer(true); });
-    on("F2", [P] { P()->rename(); });
-    on("F7", [P] { P()->new_folder(); });
-    on("Ctrl+Shift+N", [P] { P()->new_folder(); });
-    on("Ctrl+N", [P] { P()->new_file(); });
-    on("Ctrl+Z", [P] { P()->undo(); });
-    on("Ctrl+Shift+Z", [P] { P()->redo(); });
-    on("Ctrl+L", [this] { edit_path(); });
-    on("Ctrl+A", [P] { P()->select_all(); });
-    on("Ctrl+Shift+A", [P] { P()->select_filtered(); });
-    on("Ctrl+Shift+D", [P] { P()->clear_selection(); });
-    on("Ctrl+I", [P] { P()->invert_selection(); });
-    on("Ctrl+Shift+S", [P] { P()->sort_menu(); });
-    on("Ctrl+Alt+R", [P] { P()->navigate(kRecents); });
-    on("Ctrl+Alt+O", [P] {
+    bind(Cmd::MoveFiles, [P] { P()->transfer(true); });
+    bind(Cmd::Rename, [P] { P()->rename(); });
+    bind(Cmd::NewFolder, [P] { P()->new_folder(); });
+    bind(Cmd::NewFile, [P] { P()->new_file(); });
+    bind(Cmd::NewWindow, [this] {
+        App::get().open_window(active_pane()->in_recents() ? xdg::home() : active_pane()->folder(), {});
+    });
+    bind(Cmd::Undo, [P] { P()->undo(); });
+    bind(Cmd::Redo, [P] { P()->redo(); });
+    bind(Cmd::Location, [this] { edit_path(); });
+    bind(Cmd::SelectAll, [P] { P()->select_all(); });
+    bind(Cmd::SelectFiltered, [P] { P()->select_filtered(); });
+    bind(Cmd::ClearSelection, [P] { P()->clear_selection(); });
+    bind(Cmd::InvertSelection, [P] { P()->invert_selection(); });
+    bind(Cmd::SortMenu, [P] { P()->sort_menu(); });
+    bind(Cmd::GoRecent, [P] { P()->navigate(kRecents); });
+    bind(Cmd::OpenContaining, [P] {
         if (P()->current() >= 0 && (!P()->query().empty() || P()->in_recents()))
             P()->show_item(P()->current_path());
     });
-    on("Escape", [this, P] {
+    shortcut("Escape", [this, P] {
         if (field_mode_ != Field::None) {
             if (field_mode_ == Field::Filter)
                 P()->set_filter("");
@@ -1514,6 +1594,34 @@ void MainWindow::build_shortcuts() {
         }
         P()->escape();
     });
+}
+
+std::string MainWindow::keys(Cmd c) const { return chord_label(App::get().settings().shortcuts, c); }
+std::string MainWindow::key(Cmd c) const { return primary_chord(App::get().settings().shortcuts, c); }
+
+void MainWindow::set_shortcut_profile(ShortcutProfile p) {
+    // Files: applied live and kept with the other preferences.
+    Settings &s = App::get().settings();
+    if (s.shortcuts == p)
+        return;
+    s.shortcuts = p;
+    App::get().save_settings();
+    App::get().shortcuts_changed();
+}
+
+void MainWindow::shortcuts_changed() {
+    build_shortcuts();
+    update_header();
+    if (opbar_)
+        opbar_->redraw();
+    details_->show_from(active_pane());
+}
+
+void MainWindow::toggle_rail_pin() {
+    rail_->pinned(!rail_->pinned());
+    App::get().settings().rail_pinned = rail_->pinned();
+    App::get().save_settings();
+    layout();
 }
 
 } // namespace flo::ui

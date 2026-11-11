@@ -30,6 +30,7 @@ const char *op_kind_name(OpKind k) {
     case OpKind::Rename: return "rename";
     case OpKind::Duplicate: return "duplicate";
     case OpKind::NewFolder: return "new-folder";
+    case OpKind::NewFile: return "new-file";
     case OpKind::Compress: return "compress";
     case OpKind::Extract: return "extract";
     case OpKind::Trash: return "trash";
@@ -968,6 +969,40 @@ uint64_t FileOps::new_folder(std::string folder, std::string name) {
                 return;
             }
         }
+    });
+}
+
+uint64_t FileOps::new_file(std::string folder, std::string name) {
+    return enqueue(impl_, OpKind::NewFile, ConflictPolicy::KeepBoth, [folder, name](Ctx &ctx) {
+        const std::string f = absolute_path(folder);
+        if (!folder_ok(ctx, f))
+            return;
+        if (!valid_file_name(name)) {
+            ctx.error("A name can't contain \"/\".");
+            return;
+        }
+        const std::string path = path_join(f, name);
+        // Never replaces and never writes through a link: the name must be free.
+        int fd = ::open(path.c_str(), O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW | O_CLOEXEC, 0666);
+        if (fd < 0) {
+            ctx.error(errno == EEXIST ? quoted(path) + " already exists."
+                                      : "Couldn't create a file here: " + std::string(std::strerror(errno)));
+            return;
+        }
+        // The record comes from the handle the operation itself holds.
+        struct stat st;
+        if (::fstat(fd, &st) == 0) {
+            CreatedRecord rec;
+            rec.path = path;
+            rec.id = FileId{st.st_dev, st.st_ino, st.st_mode};
+            rec.size = static_cast<int64_t>(st.st_size);
+            rec.mtime_ns = timespec_ns(st.st_mtim);
+            ctx.entry.created.push_back(rec);
+            ctx.entry.label = "New file " + quoted(path);
+        }
+        ::close(fd);
+        ctx.result.created.push_back(path);
+        ctx.result.folder = f;
     });
 }
 

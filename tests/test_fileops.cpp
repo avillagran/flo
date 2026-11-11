@@ -2,6 +2,8 @@
 // home trash is $XDG_DATA_HOME/Trash, which the runner points inside the run.
 #include "harness.h"
 
+#include <fstream>
+
 #include "core/event_queue.h"
 #include "core/fileops.h"
 #include "core/fsutil.h"
@@ -422,4 +424,39 @@ TEST(file_ops_pause_resume_and_clear_pending) {
     CHECK(!exists(dst + "/c"));
     CHECK_EQ(read_file(src + "/c"), std::string("third"));
     CHECK(!o.ops.pause(a)); // finished
+}
+
+// Files' New file (Ctrl+N): exclusive, recorded, undone through the trash
+// while still untouched; a file written to since is kept.
+TEST(file_ops_new_file_undo_and_redo) {
+    const std::string d = private_dir("ops-new-file");
+    Ops o;
+    OpResult r = o.wait(o.ops.new_file(d, "notes.txt"));
+    CHECK(r.ok && r.created.size() == 1 && r.created[0] == d + "/notes.txt" && r.folder == d);
+    CHECK(exists(d + "/notes.txt") && read_file(d + "/notes.txt").empty());
+    // Never replaces an existing name, never writes through a link.
+    write_file(d + "/taken.txt", "keep");
+    r = o.wait(o.ops.new_file(d, "taken.txt"));
+    CHECK(!r.ok && read_file(d + "/taken.txt") == "keep");
+    CHECK_EQ(::symlink("taken.txt", (d + "/link.txt").c_str()), 0);
+    r = o.wait(o.ops.new_file(d, "link.txt"));
+    CHECK(!r.ok && read_file(d + "/taken.txt") == "keep");
+    r = o.wait(o.ops.new_file(d, "a/b"));
+    CHECK(!r.ok && !exists(d + "/a"));
+
+    // Undo trashes the empty file; redo puts it back.
+    r = o.wait(o.ops.undo());
+    CHECK(r.ok && !exists(d + "/notes.txt"));
+    r = o.wait(o.ops.redo());
+    CHECK(r.ok && exists(d + "/notes.txt"));
+
+    // Written to after it was made: undo keeps it.
+    r = o.wait(o.ops.new_file(d, "draft.txt"));
+    CHECK(r.ok);
+    {
+        std::ofstream out(d + "/draft.txt", std::ios::trunc); // inside the fixture
+        out << "user data";
+    }
+    r = o.wait(o.ops.undo());
+    CHECK(read_file(d + "/draft.txt") == "user data");
 }

@@ -98,6 +98,8 @@ public:
     // tells every window.
     void refresh_places();
     void save_settings();
+    // The shortcut profile changed: every window rebinds its keys.
+    void shortcuts_changed();
     // Gives freed memory back to the system once a burst of work (a folder
     // listed, thumbnails decoded and scaled) has settled.
     void trim_soon();

@@ -12,10 +12,6 @@
   "plural": false
  },
  {
-  "source": "%1 can't be created.",
-  "plural": false
- },
- {
   "source": "%1 can't be opened.",
   "plural": false
  },
@@ -816,6 +812,10 @@
   "plural": false
  },
  {
+  "source": "List, Grid, Groups, Columns, Space",
+  "plural": false
+ },
+ {
   "source": "loading…",
   "plural": false
  },
@@ -837,6 +837,10 @@
  },
  {
   "source": "Mark filtered and show all",
+  "plural": false
+ },
+ {
+  "source": "Mark without moving",
   "plural": false
  },
  {
@@ -1180,6 +1184,10 @@
   "plural": false
  },
  {
+  "source": "Profile",
+  "plural": false
+ },
+ {
   "source": "Properties",
   "plural": false
  },
@@ -1440,6 +1448,14 @@
   "plural": false
  },
  {
+  "source": "Shortcuts: Files",
+  "plural": false
+ },
+ {
+  "source": "Shortcuts: Nautilus",
+  "plural": false
+ },
+ {
   "source": "Show hidden",
   "plural": false
  },
@@ -1533,6 +1549,10 @@
  },
  {
   "source": "Subfolders not watched · not a snapshot",
+  "plural": false
+ },
+ {
+  "source": "Switch pane, or the sidebar and the list",
   "plural": false
  },
  {
@@ -1812,7 +1832,7 @@
   "plural": false
  },
  {
-  "source": "Zoom only exists in the Grid view (Ctrl+5)",
+  "source": "Zoom only exists in the Grid view (%1)",
   "plural": false
  },
  {

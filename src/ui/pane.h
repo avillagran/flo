@@ -133,6 +133,7 @@ public:
     void clear_selection();
     void select_all();
     void mark_and_advance(); // Insert
+    void toggle_mark();      // Ctrl+Insert (Nautilus: Ctrl+Space): marks without moving
     void select_filtered();  // Ctrl+Shift+A: mark the matches, show everything
     // Ctrl+N: an empty file (never overwriting).
     void new_file();
