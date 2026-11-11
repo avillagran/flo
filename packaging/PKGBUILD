@@ -1,4 +1,7 @@
 # Builds Flo from this checkout: `cd packaging && makepkg -si`.
+# To only build the package, into a private folder, without installing:
+#   P=$PWD/../build/makepkg; mkdir -p $P
+#   BUILDDIR=$P/build PKGDEST=$P/pkg SRCDEST=$P/src makepkg
 pkgname=flo
 pkgver=0.1.0
 pkgrel=1
@@ -35,7 +38,9 @@ optdepends=(
   'papers: PDF thumbnails'
   'gvfs: browsing tailnet machines over SFTP, drives'
   'tailscale: listing tailnet machines'
-  'dropbox-cli: Dropbox sync status'
+  'dropbox-cli: Dropbox sync status and links'
+  'plocate: instant search by name'
+  'localsend: sharing with nearby devices'
   'xdg-utils: opening files with their default apps'
 )
 makedepends=('cmake' 'gcc' 'fltk' 'git')
