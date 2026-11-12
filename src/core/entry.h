@@ -16,8 +16,11 @@ const char *kind_name(Kind k); // "folder", "pdf", "image", ...
 Kind kind_for_mime(const char *mime);
 
 // Folio's sort modes. "modified" is Folio's saved name for newest first.
-enum class SortMode : uint8_t { Name, Kind, Newest, Oldest, Size };
-const char *sort_mode_name(SortMode m);          // "name", "kind", "modified", "oldest", "size"
+// Files' sort criteria and directions: clicking the active column flips it
+// (Name A→Z / Z→A, Kind, Newest / Oldest, Size biggest / smallest first).
+enum class SortMode : uint8_t { Name, Kind, Newest, Oldest, Size, NameDesc, KindDesc, SizeAsc };
+// "name", "kind", "modified", "oldest", "size", "name-desc", "kind-desc", "size-asc"
+const char *sort_mode_name(SortMode m);
 bool parse_sort_mode(const std::string &s, SortMode &out); // also accepts "newest"
 
 struct Entry {

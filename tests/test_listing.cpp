@@ -345,3 +345,42 @@ TEST(search_walks_breadth_first_without_following_links) {
     CHECK(pump_until(q, [&] { return done; }));
     CHECK_EQ(n, static_cast<std::size_t>(4));
 }
+
+// Files' sort directions (listing.rs sort): Z→A by name, smallest first,
+// types reversed with names still A→Z; folders stay first.
+TEST(sort_directions_follow_files) {
+    auto mk = [](const char *name, bool dir, uint64_t size) {
+        Entry e;
+        e.name = name;
+        e.is_dir = dir;
+        e.size = size;
+        e.kind = dir ? Kind::Folder : std::string(name).find(".png") != std::string::npos ? Kind::Image : Kind::Text;
+        return e;
+    };
+    std::vector<Entry> v = {mk("b.txt", false, 30), mk("a.png", false, 10), mk("zdir", true, 0),
+                            mk("c.png", false, 20), mk("adir", true, 0)};
+    auto names = [&] {
+        std::string out;
+        for (const auto &e : v)
+            out += e.name + ",";
+        return out;
+    };
+    sort_entries(v, SortMode::NameDesc);
+    CHECK_EQ(names(), std::string("zdir,adir,c.png,b.txt,a.png,"));
+    sort_entries(v, SortMode::SizeAsc);
+    CHECK_EQ(names(), std::string("adir,zdir,a.png,c.png,b.txt,"));
+    sort_entries(v, SortMode::Size);
+    CHECK_EQ(names(), std::string("adir,zdir,b.txt,c.png,a.png,"));
+    sort_entries(v, SortMode::Kind);
+    const std::string kind = names();
+    sort_entries(v, SortMode::KindDesc);
+    CHECK(names() != kind);
+    CHECK_EQ(names().substr(0, 10), std::string("adir,zdir,"));
+    // Within one type, names stay A→Z either way.
+    CHECK(names().find("a.png") < names().find("c.png"));
+    for (const char *n : {"name-desc", "kind-desc", "size-asc"}) {
+        SortMode m;
+        CHECK(parse_sort_mode(n, m));
+        CHECK_EQ(std::string(sort_mode_name(m)), std::string(n));
+    }
+}

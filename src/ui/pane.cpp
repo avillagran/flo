@@ -1211,7 +1211,11 @@ void Pane::sort_menu() {
     const char *labels[] = {"Name", "Kind", "Newest", "Oldest", "Size"};
     for (int k = 0; k < 5; ++k) {
         SortMode m = kSorts[k];
-        items.push_back(fo::MenuItem(fo::tr(labels[k]), "", [this, m] { set_sort(m); }).check(m == sort_));
+        // A flipped column keeps its criterion checked.
+        const bool on = m == sort_ || (m == SortMode::Name && sort_ == SortMode::NameDesc) ||
+                        (m == SortMode::Kind && sort_ == SortMode::KindDesc) ||
+                        (m == SortMode::Size && sort_ == SortMode::SizeAsc);
+        items.push_back(fo::MenuItem(fo::tr(labels[k]), "", [this, m] { set_sort(m); }).check(on));
     }
     if (list_header_->visible())
         fo::PopupMenu::open_below(win_, list_header_->x(), list_header_->y(), 200, list_header_->h(), items);
@@ -1964,11 +1968,14 @@ void Pane::place_children() {
             cols[3].x = start + name_w + 24 + size_w + date_w, cols[3].w = kind_w, cols[3].right = true,
             shown.push_back(cols[3]);
         list_header_->columns(shown);
-        int sorted = sort_ == SortMode::Size ? 1 : sort_ == SortMode::Newest || sort_ == SortMode::Oldest ? 2
-                     : sort_ == SortMode::Kind ? 3 : 0;
+        int sorted = sort_ == SortMode::Size || sort_ == SortMode::SizeAsc            ? 1
+                     : sort_ == SortMode::Newest || sort_ == SortMode::Oldest       ? 2
+                     : sort_ == SortMode::Kind || sort_ == SortMode::KindDesc       ? 3
+                                                                                    : 0;
         if (sorted >= int(shown.size()))
             sorted = 0;
-        list_header_->sorted(sorted, sort_ == SortMode::Newest || sort_ == SortMode::Size);
+        list_header_->sorted(sorted, sort_ == SortMode::Newest || sort_ == SortMode::Size ||
+                                         sort_ == SortMode::NameDesc || sort_ == SortMode::KindDesc);
         ty += kListHeader;
     } else {
         list_header_->hide();
@@ -2477,15 +2484,16 @@ void Pane::sizes_arrived() {
 }
 
 void Pane::sort_clicked(int column) {
-    // Files' List header: name, size (biggest first), date (newest first,
-    // then oldest), type.
+    // Files' List header (model.rs Action::Sort): the active column flips
+    // its direction; another column starts A→Z for name and type, biggest
+    // and newest first for size and date.
     const auto &cols = list_header_columns();
     (void)cols;
     switch (column) {
-    case 1: set_sort(SortMode::Size); break;
+    case 1: set_sort(sort_ == SortMode::Size ? SortMode::SizeAsc : SortMode::Size); break;
     case 2: set_sort(sort_ == SortMode::Newest ? SortMode::Oldest : SortMode::Newest); break;
-    case 3: set_sort(SortMode::Kind); break;
-    default: set_sort(SortMode::Name); break;
+    case 3: set_sort(sort_ == SortMode::Kind ? SortMode::KindDesc : SortMode::Kind); break;
+    default: set_sort(sort_ == SortMode::Name ? SortMode::NameDesc : SortMode::Name); break;
     }
     place_children();
 }

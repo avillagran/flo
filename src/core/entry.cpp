@@ -63,6 +63,9 @@ const char *sort_mode_name(SortMode m) {
     case SortMode::Newest: return "modified";
     case SortMode::Oldest: return "oldest";
     case SortMode::Size: return "size";
+    case SortMode::NameDesc: return "name-desc";
+    case SortMode::KindDesc: return "kind-desc";
+    case SortMode::SizeAsc: return "size-asc";
     }
     return "name";
 }
@@ -73,6 +76,9 @@ bool parse_sort_mode(const std::string &s, SortMode &out) {
     else if (s == "modified" || s == "newest") out = SortMode::Newest;
     else if (s == "oldest") out = SortMode::Oldest;
     else if (s == "size") out = SortMode::Size;
+    else if (s == "name-desc") out = SortMode::NameDesc;
+    else if (s == "kind-desc") out = SortMode::KindDesc;
+    else if (s == "size-asc") out = SortMode::SizeAsc;
     else return false;
     return true;
 }
@@ -192,19 +198,26 @@ bool entry_less(const Entry &a, const Entry &b, SortMode mode) {
             return a.mtime_ns < b.mtime_ns;
         break;
     case SortMode::Size:
-        // Biggest first; folders have no size of their own and stay by name.
+    case SortMode::SizeAsc:
+        // Biggest (or smallest) first; folders have no size of their own
+        // and stay by name.
         if (!a.is_dir && a.size != b.size)
-            return a.size > b.size;
+            return mode == SortMode::Size ? a.size > b.size : a.size < b.size;
         break;
     case SortMode::Kind:
+    case SortMode::KindDesc:
+        // Files reverses the type order only; names stay A→Z within a type.
         if (!a.is_dir) {
+            const bool desc = mode == SortMode::KindDesc;
             if (a.kind != b.kind)
-                return std::strcmp(kind_name(a.kind), kind_name(b.kind)) < 0;
+                return (std::strcmp(kind_name(a.kind), kind_name(b.kind)) < 0) != desc;
             const std::string ea = a.extension(), eb = b.extension();
             if (ea != eb)
-                return natural_compare(ea, eb) < 0;
+                return (natural_compare(ea, eb) < 0) != desc;
         }
         break;
+    case SortMode::NameDesc:
+        return natural_compare(b.name, a.name) < 0;
     case SortMode::Name:
         break;
     }
