@@ -1,6 +1,7 @@
 # Core tests: a zero-dependency harness (tests/harness.h).
 file(GLOB FLO_TEST_SOURCES CONFIGURE_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/test_*.cpp)
-add_executable(flo-tests harness.cpp ${FLO_TEST_SOURCES})
+# The calculating mascot is pure and needs no toolkit.
+add_executable(flo-tests harness.cpp ${FLO_TEST_SOURCES} ${PROJECT_SOURCE_DIR}/src/ui/omi.cpp)
 target_link_libraries(flo-tests PRIVATE flo-thumbgen flo-core)
 target_compile_definitions(flo-tests PRIVATE FLO_SOURCE_DIR="${PROJECT_SOURCE_DIR}")
 add_dependencies(flo-tests flo-thumbnailer flo)

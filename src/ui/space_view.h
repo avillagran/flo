@@ -17,10 +17,14 @@
 // block to the whole map and going up shrinks the map back into its block
 // (space_map_zoom.rs): paint-only, the pane's folder and focus change at
 // once, and nothing asks for frames once the motion ends.
+//
+// While the sizes are measured, Files' Omi (ui/omi.h) blinks under
+// "Calculating sizes…"; its timer stops as soon as the map is ready.
 #pragma once
 
 #include "fltk-omarchy/anim.h"
 #include "fltk-omarchy/theme.h"
+#include "ui/omi.h"
 
 #include <FL/Fl_Widget.H>
 
@@ -36,6 +40,7 @@ class Pane;
 class SpaceView : public Fl_Widget {
 public:
     SpaceView(int x, int y, int w, int h, Pane *pane);
+    ~SpaceView() override;
     // The folder, its listing or its sizes changed.
     void sync();
     void draw() override;
@@ -66,6 +71,8 @@ public:
     static constexpr size_t kSnapshots = 8, kSnapshotTiles = 512;
     // True while the last paint left a zoom, reveal or glide running.
     bool animating() const { return animating_; }
+    // True while the calculating mascot is on screen (its timer may run).
+    bool calculating() const { return omi_shown_; }
     // Files' block colour of a name and the label colour that reads on it
     // (ui/tile_colors.h) in the current theme.
     static fo::Rgb tile_fill(const std::string &name);
@@ -167,6 +174,13 @@ private:
     fo::Anim<fo::RectF> ring_;
     std::string ring_key_;
     bool ring_valid_ = false;
+    // Files' calculating mascot.
+    Omi omi_;
+    bool omi_shown_ = false, has_pointer_ = false;
+    int pointer_x_ = 0, pointer_y_ = 0;
+    void schedule_omi();
+    void stop_omi();
+    static void omi_timer(void *);
 };
 
 } // namespace flo::ui

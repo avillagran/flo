@@ -1,6 +1,11 @@
 #include "ui/sizes.h"
 
+#include "core/xdg.h"
+
+#include <chrono>
+#include <cstdlib>
 #include <ctime>
+#include <thread>
 
 namespace flo::ui {
 
@@ -32,13 +37,18 @@ void FolderSizes::request(const std::vector<std::string> &paths, bool force) {
     auto stop = stop_;
     auto poster = queue_.poster();
     std::weak_ptr<char> weak = alive_;
+    // Tests and screenshots only (FLO_TEST_RUN): every folder takes this
+    // long, so the calculating state can be seen.
+    const int delay_ms = std::atoi(xdg::test_hook("FLO_TEST_SIZE_DELAY_MS").c_str());
     for (const auto &p : paths) {
         if (!force && results_.count(p))
             continue;
         queued_.insert(p);
-        exec_.run([p, stop, poster, weak, this] {
+        exec_.run([p, stop, poster, weak, delay_ms, this] {
             if (stop->load())
                 return;
+            for (int waited = 0; waited < delay_ms && !stop->load(); waited += 20)
+                std::this_thread::sleep_for(std::chrono::milliseconds(20));
             TreeSize t = tree_size(p, *stop);
             if (stop->load() && !t.complete)
                 return;

@@ -92,9 +92,31 @@ fo::Rgb SpaceView::readable(fo::Rgb fill) {
     return fo::Rgb(c.r, c.g, c.b);
 }
 
-SpaceView::SpaceView(int x, int y, int w, int h, Pane *pane) : Fl_Widget(x, y, w, h), pane_(pane) {
+SpaceView::SpaceView(int x, int y, int w, int h, Pane *pane)
+    : Fl_Widget(x, y, w, h), pane_(pane), omi_(fo::anim::now_ms()) {
     box(FL_NO_BOX);
     set_visible_focus();
+}
+
+SpaceView::~SpaceView() { Fl::remove_timeout(omi_timer, this); }
+
+void SpaceView::omi_timer(void *data) { static_cast<SpaceView *>(data)->redraw(); }
+
+// The mascot's next frame: a turn, the eyes gliding toward the pointer, or
+// the next turn. Nothing with animations off.
+void SpaceView::schedule_omi() {
+    Fl::remove_timeout(omi_timer, this);
+    if (!omi_shown_ || !fo::anim::enabled())
+        return;
+    double ms = omi_.next_frame(fo::anim::now_ms(), has_pointer_, pointer_x_, pointer_y_);
+    Fl::add_timeout(ms / 1000.0, omi_timer, this);
+}
+
+void SpaceView::stop_omi() {
+    Fl::remove_timeout(omi_timer, this);
+    if (omi_shown_)
+        omi_.reset(fo::anim::now_ms());
+    omi_shown_ = false;
 }
 
 std::vector<SpaceView::Block> SpaceView::treemap(const std::vector<std::pair<int, uint64_t>> &sizes, int W, int H) {
@@ -269,7 +291,7 @@ void SpaceView::layout_buttons() {
     buttons_.push_back({X + W - 186, Y, 184, 28, hidden ? fo::tr("Hide hidden") : fo::tr("Show hidden"),
                         hidden ? "eye-off" : "eye", std::string(fo::tr("Show hidden")) + ", Ctrl+H", kHidden});
     if (pane_->can_go_up())
-        buttons_.push_back({X, Y + 34, 82, 28, fo::tr("Back"), "arrow-up", "", kBack});
+        buttons_.push_back({X, Y + 34, 82, 28, fo::tr("Go back"), "arrow-up", "", kBack});
     buttons_.push_back({X + 88, Y + 34, 112, 28, fo::tr("Recalculate"), "refresh-cw",
                         fo::tr("Refresh the Space calculation"), kRecalc});
     if (scanning())
@@ -393,6 +415,7 @@ int SpaceView::handle(int event) {
     case FL_HIDE:
         // Another view takes over: a later return is not a navigation.
         leave();
+        stop_omi();
         return Fl_Widget::handle(event);
     case FL_FOCUS:
     case FL_UNFOCUS:
@@ -400,6 +423,11 @@ int SpaceView::handle(int event) {
         return 1;
     case FL_ENTER:
     case FL_MOVE: {
+        has_pointer_ = true;
+        pointer_x_ = Fl::event_x();
+        pointer_y_ = Fl::event_y();
+        if (omi_shown_)
+            schedule_omi(); // the eyes follow the pointer
         int b = block_at(Fl::event_x(), Fl::event_y());
         int k = button_at(Fl::event_x(), Fl::event_y());
         if (b != hover_ || k != hover_button_) {
@@ -410,6 +438,9 @@ int SpaceView::handle(int event) {
         return 1;
     }
     case FL_LEAVE:
+        has_pointer_ = false;
+        if (omi_shown_)
+            schedule_omi();
         hover_ = -1;
         hover_button_ = -1;
         redraw();
@@ -799,9 +830,9 @@ void SpaceView::draw_tip(int tip, int px, int py, bool pointer) {
     std::string detail = kind_word(e) + " \xC2\xB7 " + si_size(k.bytes);
     if (e.is_dir)
         if (const FolderSizes::Result *r = App::get().sizes().get(m.path(k.index)))
-            detail = fo::i18n::arg(fo::i18n::arg(fo::i18n::arg(fo::tr("%1 \xC2\xB7 %2 files, %3 folders"), detail),
-                                                 std::to_string(r->files)),
-                                   std::to_string(r->folders));
+            // Files' tooltip: " · N archivo(s) · N carpeta(s)".
+            detail += " \xC2\xB7 " + fo::trn("%n files", (long long)r->files) + " \xC2\xB7 " +
+                      fo::trn("%n folders", (long long)r->folders);
     lines.push_back(detail);
     if (total_ > 0) {
         double share = 100.0 * double(k.bytes) / double(total_);
@@ -928,11 +959,26 @@ void SpaceView::draw() {
                 fo::paint::round_frame(ox, oy, ow, oh, 6 * rad, 2, tile_fill(path_basename(path)));
             }
         }
-        if (!moving)
-            fo::text::draw(fo::tr("Calculating sizes\xE2\x80\xA6"), x(), y() + kToolbar, w(), 50, t.dim(),
-                           fo::text::REGULAR, 12, FL_ALIGN_CENTER);
+        if (!moving) {
+            const int map_y = y() + kToolbar;
+            fo::text::draw(fo::tr("Calculating sizes\xE2\x80\xA6"), x(), map_y, w(), 50, t.dim(), fo::text::REGULAR,
+                           12, FL_ALIGN_LEFT);
+            // Files' Omi blinks under it (space_map_view.rs: 72 px, 60 px down).
+            const int size = std::min({72, w(), std::max(0, y() + h() - map_y - 60)});
+            const double now = fo::anim::now_ms();
+            if (const Omi::Rect *r = omi_.layout(x() + (w() - size) / 2, map_y + 60, size, size, has_pointer_,
+                                                 pointer_x_, pointer_y_, now)) {
+                for (int i = 0; i < Omi::kRects; ++i)
+                    fo::paint::fill(r[i].x, r[i].y, r[i].w, r[i].h, t.accent());
+                omi_shown_ = true;
+                schedule_omi();
+            }
+        } else {
+            stop_omi();
+        }
         draw_ring(nullptr, 0);
     } else {
+        stop_omi();
         remember(path);
         fo::RectF map = rect_f(map_x_, map_y_, map_w_, map_h_);
         Plan plan;
