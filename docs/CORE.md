@@ -35,7 +35,7 @@ UI. A CLI or test loops on `queue.wait(ms)` and `queue.dispatch()`.
 | Header | Main types | What for |
 |---|---|---|
 | `event_queue.h` | `EventQueue`, `CancelToken`, `AliveGuard`, `Executor` | Delivery to the UI thread, cancellation, serial workers |
-| `entry.h` | `Entry`, `Kind`, `SortMode`, `sort_entries` | Folder entries (type by GIO content type, sniffed only when the name doesn't tell), Folio's kinds and five sort modes, folders first |
+| `entry.h` | `Entry`, `Kind`, `SortMode`, `sort_entries` | Folder entries (type by GIO content type, sniffed only when the name doesn't tell), Folio's kinds; Files' sort criteria in both directions (name A→Z / Z→A, type, newest / oldest, biggest / smallest), folders first |
 | `natural_sort.h` | `natural_compare`, `fold_case` | Case-insensitive natural order ("file2" < "file10") |
 | `lister.h` | `Lister`, `Listing`, `list_folder`, `summarize_folder`, `ListingCache` | Off-thread listing with snapshots for slow folders, lazy folder summaries (item count and a peek of the first two pictures), remembered listings for instant Back/Forward |
 | `watcher.h` | `Watcher` | inotify live reload, debounced (250 ms), folder or single file (recently-used.xbel) |
@@ -47,9 +47,10 @@ UI. A CLI or test loops on `queue.wait(ms)` and `queue.dispatch()`.
 | `undo.h` | `UndoHistory`, `UndoEntry`, `verify_created` | Undo/redo with identity checks |
 | `fileops.h` | `FileOps`, `OpResult`, `OpProgress`, `OpConflict` | The operation queue: copy, move, paste, drop, duplicate, rename, new folder, compress, extract, trash, restore, delete permanently, empty trash, undo, redo |
 | `clipboard.h` | `clipboard::*` | `x-special/gnome-copied-files`, `text/uri-list`, KDE cut flag, plain text |
-| `places.h` | `places::*`, `Place`, `Devices` | Home places, GTK bookmarks, Recents/Trash views, drives; mount/unmount/eject |
-| `recents.h` | `recents::read/list/add` | GTK's recently-used.xbel |
-| `network.h` | `Network`, `TailnetPeer` | Tailnet machines and Dropbox status |
+| `places.h` | `places::*`, `Place`, `Devices` | Home places, GTK bookmarks (pin, unpin, relabel, `move_bookmark`), Recents/Trash views, drives; mount/unmount/eject |
+| `rail_order.h` | `rail_order::*` | Files' saved order of the rail's places and devices (`[rail] order`, stable keys, never paths) |
+| `recents.h` | `recents::read/list/add/remove` | GTK's recently-used.xbel |
+| `network.h` | `Network`, `TailnetPeer`, `GvfsShare`, `NetworkLocation` | Tailnet machines, Dropbox status, Files' network locations: typed URIs checked (`parse_network_uri`), connected GVfs locations read from the FUSE bridge (`scan_gvfs`), disconnect (`unmount_location`, `gio mount -u`) |
 | `mounter.h` | `Mounter`, `MountRequest` | GVfs mounts (SFTP to tailnet machines, remote bookmarks) |
 | `dbus_service.h` | `DBusService`, `forward_open_to_running_flo` | `org.freedesktop.FileManager1` and single instance |
 | `settings.h` | `Settings`, `Ini` | `~/.config/flo/flo.conf` |
@@ -81,10 +82,18 @@ UI. A CLI or test loops on `queue.wait(ms)` and `queue.dispatch()`.
   `uri_list`, `plain_text`; parse with `parse_any`; then
   `FileOps::paste(paths, folder, cut)`.
 - **Sidebar.** `places::xdg_places` (Files' Places: Home and the XDG user
-  folders), `places::pinned(read_bookmarks())` (Bookmarks),
-  `places::remote_bookmarks`, `places::views()`, `Devices::watch()`,
-  `Network::refresh_tailnet/refresh_dropbox` (Share's Dropbox Link) every
-  15 s while a window is visible (nothing runs when no window is open).
+  folders, shown in `rail_order::ordered_indices` order with Files' glyph
+  by list position), `places::pinned(read_bookmarks())` (Bookmarks, moved
+  with `places::move_bookmark`), `places::remote_bookmarks`,
+  `places::views()`, `Devices::watch()`,
+  `Network::refresh_tailnet/refresh_dropbox/refresh_shares` (Share's
+  Dropbox Link, the connected GVfs locations) every 15 s while a window is
+  visible (nothing runs when no window is open), and after Flo's own
+  connect or disconnect.
+- **Connect to a server.** "Connect…" opens the location field with
+  `smb://`; Enter checks the text with `parse_network_uri` and mounts the
+  URI with `Mounter` (an inline password answers its first request once);
+  `Network::disconnect(share)` runs `gio mount -u` on its own worker.
 - **Opening a tailnet machine.** `Mounter::mount(sftp_uri(host),
   network.is_tailnet_host(host), callbacks)`. A password prompt arrives as
   `MountRequest`; answer with `reply_password` (kept by GVfs for the session

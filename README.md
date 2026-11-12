@@ -43,8 +43,10 @@ next and what is left out of this phase.
   toolkit): Files' header (back/forward/up, path chips, Search, Edit path,
   Groups, List, Grid, Space, Columns, Inspector, Actions, Preferences; a
   label on hover, the shortcut after a rest), tabs (Ctrl+T, Ctrl+W,
-  Ctrl+Shift+T, Ctrl+Tab), the expandable rail (pinned folders, Recents,
-  home folders, drives with eject, tailnet machines, the trash), the views
+  Ctrl+Shift+T, Ctrl+Tab), the expandable rail (Files' places and
+  bookmarks, reordered by dragging, Recents, drives with eject, the
+  Network section with "Connect…", connected locations and tailnet
+  machines, the trash), the views
   (Ctrl+1 Groups, 2 List, 3 Columns, 4 Space, 5 Grid), the inspector
   (Ctrl+Alt+I) with automatic folder sizes (Ctrl+Space recalculates), the
   status bar with live PSS, type-to-filter (`*.pdf`, `ext:md`, `type:dir`,
