@@ -219,7 +219,22 @@ void App::network_tick(void *data) {
             app->places_changed();
     });
     app->network_->refresh_dropbox([app](std::string status) { app->places_.dropbox = std::move(status); });
+    app->refresh_shares();
     Fl::add_timeout(15.0, network_tick, app);
+}
+
+void App::refresh_shares() {
+    network_->refresh_shares([this](std::vector<GvfsShare> shares) {
+        if (shares == places_.shares)
+            return;
+        places_.shares = std::move(shares);
+        places_changed();
+    });
+}
+
+void App::network_job(int delta) {
+    network_jobs_ = std::max(0, network_jobs_ + delta);
+    places_changed();
 }
 
 void App::copy_files(const std::vector<std::string> &paths, bool cut) {

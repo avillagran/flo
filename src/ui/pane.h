@@ -93,7 +93,9 @@ public:
     void open_path(const std::string &path);
     void show_item(const std::string &path); // its folder, selected
     void open_peer(const std::string &host);
-    void open_uri(const std::string &uri);
+    // Mounts a location through GVfs and opens it. `password` (typed
+    // inline in the URI, never kept) answers the first password request.
+    void open_uri(const std::string &uri, const std::string &password = {});
     void mount_volume(const std::string &id);
 
     // Selection.
@@ -279,6 +281,7 @@ private:
     bool searching_ = false;
     bool showing_cached_ = false; // a remembered listing, being re-read
     bool password_given_ = false; // a mount password was just answered
+    std::string inline_password_;  // from the typed URI, for one request
 
     std::string message_;
     bool message_error_ = true;

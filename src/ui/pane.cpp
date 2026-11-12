@@ -753,6 +753,17 @@ void Pane::go_home() { navigate(xdg::home()); }
 std::string Pane::typed_path() const { return in_recents() ? std::string() : folder_; }
 
 bool Pane::go_typed(const std::string &text) {
+    if (is_network_uri(text)) {
+        // Files' parse(): a bad address stays in the field to be fixed.
+        NetworkLocation loc;
+        std::string error = parse_network_uri(text, loc);
+        if (!error.empty()) {
+            fo::Toast::show(win_, fo::i18n::arg(fo::tr("Path: %1"), fo::tr(error.c_str())), 4, fo::Toast::Error);
+            return false;
+        }
+        open_uri(loc.uri, loc.inline_password);
+        return true;
+    }
     if (!uri_scheme(text).empty() && uri_scheme(text) != "file") {
         open_uri(text);
         return true;
@@ -806,6 +817,7 @@ void Pane::show_item(const std::string &path) {
 
 void Pane::open_peer(const std::string &host) {
     password_given_ = false;
+    inline_password_.clear();
     busy_ = fo::i18n::arg(fo::tr("Connecting to %1\xE2\x80\xA6"), host.substr(0, host.find('.')));
     place_children();
     redraw();
@@ -815,10 +827,13 @@ void Pane::open_peer(const std::string &host) {
     cb.on_request = [this](const MountRequest &r) { ask_mount(r); };
     cb.on_mounted = [this](const std::string &local, const std::string &landing) {
         busy_.clear();
+        App::get().network_job(-1);
+        App::get().refresh_shares();
         navigate(landing.empty() ? local : landing);
     };
     cb.on_failed = [this](const std::string &error) {
         busy_.clear();
+        App::get().network_job(-1);
         if (!error.empty())
             show_message(error);
         place_children();
@@ -827,11 +842,14 @@ void Pane::open_peer(const std::string &host) {
     if (!mounter_->mount(sftp_uri(host), App::get().network().is_tailnet_host(host), cb)) {
         busy_.clear();
         fo::Toast::show(win_, fo::tr("Still connecting to another machine"), 3);
+        return;
     }
+    App::get().network_job(+1);
 }
 
-void Pane::open_uri(const std::string &uri) {
+void Pane::open_uri(const std::string &uri, const std::string &password) {
     password_given_ = false;
+    inline_password_ = password;
     busy_ = fo::i18n::arg(fo::tr("Connecting to %1\xE2\x80\xA6"), uri);
     place_children();
     redraw();
@@ -839,19 +857,31 @@ void Pane::open_uri(const std::string &uri) {
         mounter_ = std::make_unique<Mounter>(App::get().queue());
     MountCallbacks cb;
     cb.on_request = [this](const MountRequest &r) { ask_mount(r); };
-    cb.on_mounted = [this](const std::string &local, const std::string &landing) {
+    cb.on_mounted = [this, uri](const std::string &local, const std::string &landing) {
         busy_.clear();
+        inline_password_.clear();
+        App::get().network_job(-1);
+        App::get().refresh_shares();
         navigate(landing.empty() ? local : landing);
+        fo::Toast::show(win_, fo::i18n::arg(fo::tr("Connected to %1"), uri), 3);
     };
-    cb.on_failed = [this](const std::string &error) {
+    cb.on_failed = [this, uri](const std::string &error) {
         busy_.clear();
+        inline_password_.clear();
+        App::get().network_job(-1);
         if (!error.empty())
-            show_message(error);
+            show_message(uri + ": " + error);
         place_children();
         redraw();
     };
-    if (!mounter_->mount(uri, false, cb))
+    if (!mounter_->mount(uri, false, cb)) {
         busy_.clear();
+        inline_password_.clear();
+        // Files: one network job at a time.
+        fo::Toast::show(win_, fo::tr("Wait for the network connection in progress"), 3);
+        return;
+    }
+    App::get().network_job(+1);
 }
 
 // GVfs's questions come in paragraphs. The dialog wraps each one; this only
@@ -884,6 +914,15 @@ void Pane::ask_mount(const MountRequest &r) {
     s.scrim_cancels = false;
     s.message = tidy_paragraphs(r.message);
     uint64_t id = r.id;
+    if (r.kind == MountRequest::Password && !inline_password_.empty() && !password_given_) {
+        // The password typed in the URI answers the first request once.
+        std::string pw;
+        pw.swap(inline_password_);
+        password_given_ = true;
+        if (mounter_)
+            mounter_->reply_password(id, r.user, pw, r.domain);
+        return;
+    }
     if (r.kind == MountRequest::Password) {
         s.title = fo::tr("Sign in");
         // Asked again after an answer: the password didn't work.

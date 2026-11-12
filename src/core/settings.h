@@ -48,6 +48,14 @@ struct Settings {
     int window_width = 1100, window_height = 700; // Files' first size
     bool window_maximized = false;
     int thumbnail_size = 256; // requested pixels (Folio: large)
+    // Files' "Interface borders" (omarchy: Hyprland's rounding, square,
+    // rounded) and "Theme" (the live Omarchy theme or Tokyo Night as a
+    // local view), [view] corners and theme.
+    std::string corners = "omarchy";
+    bool local_theme = false;
+    // Files' rail_order: the places and devices dragged to a new place in
+    // the rail ([rail] order, keys from core/rail_order.h).
+    std::vector<std::string> rail_order;
 
     static std::string path(); // $XDG_CONFIG_HOME/flo/flo.conf
     // Missing file or keys give the defaults; bad values are ignored.

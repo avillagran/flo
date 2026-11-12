@@ -98,6 +98,9 @@ public:
     // (Ctrl+Shift+F).
     enum class Field { None, Path, Filter, Search };
     void edit_path();
+    // Files' "Connect to server…": the location field with "smb://", ready
+    // for a server; Enter connects through GVfs.
+    void connect_server();
     void begin_filter(const std::string &text = {});
     void begin_search();
     void end_field(bool refocus = true);
@@ -154,6 +157,12 @@ private:
     static void pss_tick(void *);
     void activate_row(const fo::SidebarRow &row);
     void sidebar_context(const fo::SidebarRow &row, int x, int y);
+    // Files' reordering: places and devices through [rail] order, bookmarks
+    // in the GTK bookmarks file. `index` counts the section's other rows.
+    void reorder_row(const fo::SidebarRow &row, int index);
+    // The rows of the section `row` is in that reorder, in rail order.
+    std::vector<fo::SidebarRow> reorder_siblings(const fo::SidebarRow &row) const;
+    void disconnect_share(const std::string &path);
     std::string place_for(const std::string &folder) const;
     Pane *make_pane(const std::string &folder, int view);
     void run_omnibar(const std::string &text);
@@ -180,6 +189,8 @@ private:
     std::vector<Pane *> tabs_;
     std::vector<std::string> closed_tabs_;
     int tab_ = 0;
+    // The rail's sections whose rows reorder (Files' ORDERED_SECTIONS).
+    int places_sec_ = -1, marks_sec_ = -1, drives_sec_ = -1;
     Pane *dual_ = nullptr;
     int active_ = 0; // 0: the tab, 1: the dual pane
     bool details_on_ = true;

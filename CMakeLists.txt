@@ -46,6 +46,7 @@ add_library(flo-core STATIC
   src/core/path_completion.cpp
   src/core/network.cpp
   src/core/places.cpp
+  src/core/rail_order.cpp
   src/core/process.cpp
   src/core/recents.cpp
   src/core/search.cpp

@@ -185,6 +185,39 @@ bool unpin(const std::string &path, const std::string &file) {
     return lines.size() != before && write_lines(file, lines);
 }
 
+std::string move_bookmark(const std::string &path, std::size_t index, const std::string &file) {
+    const std::string clean = clean_path(absolute_path(path));
+    auto lines = raw_lines(file);
+    // The Bookmarks section's rows, as pinned() lists them, with their lines.
+    std::vector<std::pair<std::string, std::size_t>> rows;
+    std::set<std::string> seen;
+    for (std::size_t i = 0; i < lines.size(); ++i) {
+        const auto b = parse_bookmarks(lines[i]);
+        if (b.empty() || b[0].path.empty() || !seen.insert(b[0].path).second || !is_dir(b[0].path))
+            continue;
+        rows.push_back({b[0].path, i});
+    }
+    std::size_t from = rows.size();
+    for (std::size_t k = 0; k < rows.size(); ++k)
+        if (rows[k].first == clean)
+            from = k;
+    if (from == rows.size())
+        return "The bookmark no longer exists.";
+    const std::size_t line = rows[from].second;
+    rows.erase(rows.begin() + std::ptrdiff_t(from));
+    index = std::min(index, rows.size());
+    if (index == from)
+        return {};
+    std::string text = lines[line];
+    lines.erase(lines.begin() + std::ptrdiff_t(line));
+    auto shifted = [&](std::size_t l) { return l > line ? l - 1 : l; };
+    const std::size_t at = index < rows.size() ? shifted(rows[index].second) : shifted(rows.back().second) + 1;
+    lines.insert(lines.begin() + std::ptrdiff_t(at), text);
+    if (!write_lines(file, lines))
+        return "Couldn't save the bookmarks to " + file + ".";
+    return {};
+}
+
 std::string relabel(const std::string &path, const std::string &label, const std::string &file) {
     if (label.size() > 96)
         return "A label holds 1 to 96 bytes.";

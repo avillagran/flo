@@ -36,6 +36,7 @@ struct PlacesData {
     std::vector<Place> places; // Files' Places: Home and the XDG user folders
     std::vector<Place> pinned, remote, views, drives;
     std::vector<TailnetPeer> peers;
+    std::vector<GvfsShare> shares; // connected GVfs locations (Files' Network rows)
     std::string dropbox; // synced / syncing / stopped / "" (Share's Dropbox Link)
 };
 
@@ -98,6 +99,12 @@ public:
     // Re-reads home folders, bookmarks and views (cheap, synchronous) and
     // tells every window.
     void refresh_places();
+    // Re-reads the connected GVfs locations (after a connect or disconnect;
+    // otherwise with the 15 s network poll) and tells every window.
+    void refresh_shares();
+    // Files' busy "Connect…" row: network jobs (connect, disconnect) running.
+    void network_job(int delta);
+    bool network_busy() const { return network_jobs_ > 0; }
     void save_settings();
     // The shortcut profile changed: every window rebinds its keys.
     void shortcuts_changed();
@@ -142,6 +149,7 @@ private:
     std::string clip_text_;
     int bookmarks_watch_ = 0;
     bool devices_started_ = false, polling_ = false;
+    int network_jobs_ = 0;
 };
 
 } // namespace flo::ui

@@ -1,5 +1,6 @@
 #include "core/settings.h"
 #include "core/fsutil.h"
+#include "core/rail_order.h"
 #include "core/xdg.h"
 
 #include <cstdlib>
@@ -146,6 +147,11 @@ void Settings::read_from(const Ini &ini) {
     parse_int(ini.get("window", "width"), 200, 20000, window_width);
     parse_int(ini.get("window", "height"), 150, 20000, window_height);
     parse_bool(ini.get("window", "maximized"), window_maximized);
+    rail_order = rail_order::parse(ini.get("rail", "order"));
+    const std::string c = ini.get("view", "corners", corners);
+    if (c == "omarchy" || c == "square" || c == "rounded")
+        corners = c;
+    local_theme = ini.get("view", "theme") == "tokyo-night";
 }
 
 void Settings::write_to(Ini &ini) const {
@@ -162,6 +168,10 @@ void Settings::write_to(Ini &ini) const {
     ini.set("window", "width", std::to_string(window_width));
     ini.set("window", "height", std::to_string(window_height));
     ini.set("window", "maximized", window_maximized ? "true" : "false");
+    ini.set("view", "corners", corners);
+    ini.set("view", "theme", local_theme ? "tokyo-night" : "system");
+    if (!rail_order.empty() || ini.has("rail", "order"))
+        ini.set("rail", "order", rail_order::serialize(rail_order));
 }
 
 Settings Settings::load(const std::string &file) {

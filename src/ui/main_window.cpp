@@ -1,7 +1,10 @@
 #include "ui/main_window.h"
 
 #include "core/fsutil.h"
+#include "core/network.h"
 #include "core/path_completion.h"
+#include "core/places.h"
+#include "core/rail_order.h"
 #include "core/shortcuts.h"
 #include "core/settings.h"
 #include "core/tree_size.h"
@@ -194,9 +197,20 @@ MainWindow::MainWindow(int W, int H, const std::string &folder, const std::strin
         App::get().save_settings();
     });
     rail_->on_activate([this](const fo::SidebarRow &r) { activate_row(r); });
-    rail_->on_finished([this] { active_pane()->focus_view(); });
+    // A row that opened the location field ("Connect…") keeps the keyboard there.
+    rail_->on_finished([this] {
+        if (!typing())
+            active_pane()->focus_view();
+    });
     rail_->on_eject([this](const fo::SidebarRow &r) {
         std::string path = r.id;
+        // Network locations disconnect (Files: Desconectar).
+        for (const auto &s : App::get().places().shares)
+            if (s.path == path || (path.compare(0, 8, "tailnet:") == 0 && s.protocol == "SFTP" &&
+                                   s.title == path.substr(8))) {
+                disconnect_share(s.path);
+                return;
+            }
         auto done = [this, path](bool ok, const std::string &, const std::string &error) {
             fo::Toast::show(this, ok ? fo::i18n::arg(fo::tr("You can remove %1 now"), path_basename(path))
                                      : (error.empty() ? fo::tr("The drive is busy") : error),
@@ -211,6 +225,10 @@ MainWindow::MainWindow(int W, int H, const std::string &folder, const std::strin
     });
     rail_->on_context([this](const fo::SidebarRow &r, int x, int y) { sidebar_context(r, x, y); });
     rail_->accepts_drop([](const fo::SidebarRow &r) { return !r.id.empty() && r.id[0] == '/'; });
+    rail_->accepts_reorder([this](const fo::SidebarRow &r) {
+        return r.section == places_sec_ || r.section == marks_sec_ || r.section == drives_sec_;
+    });
+    rail_->on_reorder([this](const fo::SidebarRow &r, int index) { reorder_row(r, index); });
     rail_->on_drop([this](const fo::SidebarRow &r, const std::string &text) {
         bool cut = false;
         active_pane()->drop_into(App::get().paths_from_clipboard(text, cut), r.id);
@@ -864,6 +882,18 @@ void MainWindow::edit_path() {
     field_->take_focus();
 }
 
+void MainWindow::connect_server() {
+    // Files' connect_server_prompt (network_ui.rs): the location field
+    // starts with smb://, the cursor at its end.
+    const std::string start = "smb://";
+    field_mode_ = Field::Path;
+    field_->placeholder(fo::tr("A path, >command or :place"));
+    field_->set_text(start, int(start.size()), int(start.size()));
+    layout();
+    field_->take_focus();
+    status_->left(fo::tr("Type smb://, sftp://, ftp://, dav:// or nfs:// and the server \xC2\xB7 Enter connects"));
+}
+
 // --- Files' Tab completion in the location field (path_edit.rs) -------------------
 
 bool MainWindow::path_key(int k) {
@@ -1254,40 +1284,100 @@ std::string MainWindow::place_for(const std::string &folder) const {
 
 // The rail's Favorites row opens the favorites hub (Files: Action::Bookmarks).
 static const char *const kFavoritesRow = "favorites:";
+// Files' "Connect…" row of the Network section.
+static const char *const kConnectRow = "net:connect";
+
+// Files' place glyphs (places_sidebar.rs place_glyph): by the place's
+// position in the list, not by its folder: Home, then download, document,
+// picture, music and film, and the database glyph for the rest.
+static const char *place_glyph(std::size_t index) {
+    static const char *const glyphs[] = {"home", "download", "file-text", "image", "music", "video"};
+    return index < 6 ? glyphs[index] : "database";
+}
+
+// The rail key of a Places or Devices row (core/rail_order.h).
+static std::string rail_key(const PlacesData &pd, const fo::SidebarRow &r, bool device) {
+    if (device) {
+        for (const auto &p : pd.drives)
+            if (r.id == (p.mounted && !p.path.empty() ? p.path : "volume:" + p.id))
+                return rail_order::device_key(p.name);
+        return {};
+    }
+    for (const auto &p : pd.places)
+        if (p.path == r.id)
+            return rail_order::place_key(p.path, p.name);
+    return {};
+}
+
+// The Network row of a connected location: "%1 on %2" with a share.
+static std::string share_label(const GvfsShare &s) {
+    return s.share.empty() ? s.title : fo::i18n::arg(fo::i18n::arg(fo::tr("%1 on %2"), s.share), s.title);
+}
 
 void MainWindow::rebuild_sidebar() {
     const PlacesData &pd = App::get().places();
+    const auto &order = App::get().settings().rail_order;
     int cursor = rail_->cursor();
     rail_->clear();
     // Files' rail (places_sidebar.rs): Favorites, Recents and Starred,
-    // then Places (Home and the XDG folders), Bookmarks, Devices, Network,
-    // and the trash at the bottom.
+    // then Places (Home and the XDG folders), Bookmarks, Devices, Network
+    // (always, with "Connect…"), and the trash at the bottom.
     rail_->add_section("");
     rail_->add_row({fo::tr("Favorites"), "star", kFavoritesRow});
     for (const auto &p : pd.views)
         if (p.icon == "recent")
             rail_->add_row({fo::tr(p.name.c_str()), "recent", p.path});
     rail_->add_row({fo::tr("Starred"), "star-outline", kStarred});
-    rail_->add_section(fo::tr("Places"), pd.home);
-    for (const auto &p : pd.places)
-        rail_->add_row({fo::tr(p.name.c_str()), place_icon(p.icon), p.path});
-    int marks = rail_->add_section(fo::tr("Bookmarks"));
+    places_sec_ = rail_->add_section(fo::tr("Places"), pd.home);
+    {
+        std::vector<std::string> keys;
+        for (const auto &p : pd.places)
+            keys.push_back(rail_order::place_key(p.path, p.name));
+        for (std::size_t i : rail_order::ordered_indices(keys, order))
+            rail_->add_row({fo::tr(pd.places[i].name.c_str()), place_glyph(i), pd.places[i].path});
+    }
+    marks_sec_ = rail_->add_section(fo::tr("Bookmarks"));
     for (const auto &p : pd.pinned)
         rail_->add_row({p.name, "bookmark", p.path});
-    rail_->section_visible(marks, !pd.pinned.empty());
-    int drives = rail_->add_section(fo::tr("Devices"));
-    for (const auto &p : pd.drives) {
-        fo::SidebarRow r(p.name, place_icon(p.icon), p.mounted && !p.path.empty() ? p.path : "volume:" + p.id);
-        r.ejectable = p.mounted && (p.can_eject || p.can_unmount);
-        rail_->add_row(r);
+    rail_->section_visible(marks_sec_, !pd.pinned.empty());
+    drives_sec_ = rail_->add_section(fo::tr("Devices"));
+    {
+        std::vector<std::string> keys;
+        for (const auto &p : pd.drives)
+            keys.push_back(rail_order::device_key(p.name));
+        for (std::size_t i : rail_order::ordered_indices(keys, order)) {
+            const Place &p = pd.drives[i];
+            fo::SidebarRow r(p.name, place_icon(p.icon), p.mounted && !p.path.empty() ? p.path : "volume:" + p.id);
+            r.ejectable = p.mounted && (p.can_eject || p.can_unmount);
+            rail_->add_row(r);
+        }
     }
-    rail_->section_visible(drives, !pd.drives.empty());
-    int net = rail_->add_section(fo::tr("Network"));
+    rail_->section_visible(drives_sec_, !pd.drives.empty());
+    rail_->add_section(fo::tr("Network"));
     for (const auto &p : pd.remote)
         rail_->add_row({p.name, "globe", "mount:" + p.uri});
-    for (const auto &p : pd.peers)
-        rail_->add_row({p.name, p.os == "linux" ? "server" : "laptop", "tailnet:" + p.host});
-    rail_->section_visible(net, !pd.peers.empty() || !pd.remote.empty());
+    std::vector<bool> shown(pd.shares.size(), false);
+    for (const auto &p : pd.peers) {
+        fo::SidebarRow r(p.name, p.os == "linux" ? "server" : "laptop", "tailnet:" + p.host);
+        // A connected machine disconnects from its own row.
+        for (std::size_t k = 0; k < pd.shares.size(); ++k)
+            if (pd.shares[k].protocol == "SFTP" && pd.shares[k].title == p.host)
+                shown[k] = r.ejectable = true;
+        rail_->add_row(r);
+    }
+    for (std::size_t k = 0; k < pd.shares.size(); ++k) {
+        if (shown[k])
+            continue;
+        const GvfsShare &s = pd.shares[k];
+        // Files' second line (protocol · user) has no room in Flo's one-line
+        // rows; the name keeps the space.
+        fo::SidebarRow r(share_label(s), "server", s.path);
+        r.ejectable = true;
+        rail_->add_row(r);
+    }
+    fo::SidebarRow connect(fo::tr("Connect\xE2\x80\xA6"), "plus", kConnectRow);
+    connect.busy = App::get().network_busy();
+    rail_->add_row(connect);
     for (const auto &p : pd.views)
         if (p.icon == "trash") {
             fo::SidebarRow r(fo::tr(p.name.c_str()), "trash", p.path);
@@ -1300,11 +1390,88 @@ void MainWindow::rebuild_sidebar() {
     rail_->redraw();
 }
 
+std::vector<fo::SidebarRow> MainWindow::reorder_siblings(const fo::SidebarRow &row) const {
+    std::vector<fo::SidebarRow> out;
+    if (row.section != places_sec_ && row.section != marks_sec_ && row.section != drives_sec_)
+        return out;
+    for (const auto &r : rail_->rows())
+        if (r.section == row.section && !r.footer)
+            out.push_back(r);
+    return out;
+}
+
+void MainWindow::reorder_row(const fo::SidebarRow &row, int index) {
+    App &app = App::get();
+    if (index < 0)
+        return;
+    if (row.section == marks_sec_) {
+        // Bookmarks keep their order in the GTK bookmarks file.
+        std::string error = places::move_bookmark(row.id, std::size_t(index));
+        if (!error.empty())
+            fo::Toast::show(this, fo::tr(error.c_str()), 3, fo::Toast::Error);
+        app.refresh_places();
+        return;
+    }
+    const bool device = row.section == drives_sec_;
+    const PlacesData &pd = app.places();
+    std::vector<std::string> visible;
+    for (const auto &r : reorder_siblings(row))
+        visible.push_back(rail_key(pd, r, device));
+    std::vector<std::string> out;
+    if (!rail_order::moved(app.settings().rail_order, visible, rail_key(pd, row, device), std::size_t(index), out))
+        return;
+    app.settings().rail_order = out;
+    app.save_settings();
+    app.refresh_places();
+}
+
+void MainWindow::disconnect_share(const std::string &path) {
+    App &app = App::get();
+    const GvfsShare *found = nullptr;
+    for (const auto &s : app.places().shares)
+        if (s.path == path)
+            found = &s;
+    if (!found)
+        return;
+    if (app.network_busy()) {
+        fo::Toast::show(this, fo::tr("Wait for the network connection in progress"), 3);
+        return;
+    }
+    const GvfsShare share = *found;
+    const std::string label = share_label(share);
+    // Files leaves the location first when it is open.
+    for (MainWindow *w : app.windows()) {
+        for (Pane *p : w->tabs_)
+            if (path_inside(p->folder(), share.path))
+                p->go_home();
+        if (w->dual_ && path_inside(w->dual_->folder(), share.path))
+            w->dual_->go_home();
+    }
+    status_->left(fo::i18n::arg(fo::tr("Disconnecting %1\xE2\x80\xA6"), label));
+    app.network_job(+1);
+    app.network().disconnect(share, [this, label](std::string error) {
+        App &a = App::get();
+        a.network_job(-1);
+        a.refresh_shares();
+        bool open = false;
+        for (MainWindow *w : a.windows())
+            open = open || w == this;
+        if (!open)
+            return;
+        if (error.empty())
+            fo::Toast::show(this, fo::i18n::arg(fo::tr("%1 disconnected"), label), 3);
+        else
+            fo::Toast::show(this, label + ": " + fo::tr(error.c_str()), 4, fo::Toast::Error);
+    });
+}
+
 void MainWindow::activate_row(const fo::SidebarRow &r) {
     Pane *p = active_pane();
     const std::string &id = r.id;
     if (id == kFavoritesRow)
         FavoritesHub::open(this, p);
+    else if (id == kConnectRow)
+        connect_server();
     else if (id.compare(0, 8, "tailnet:") == 0)
         p->open_peer(id.substr(8));
     else if (id.compare(0, 6, "mount:") == 0)
@@ -1318,8 +1485,19 @@ void MainWindow::activate_row(const fo::SidebarRow &r) {
 void MainWindow::sidebar_context(const fo::SidebarRow &r, int x, int y) {
     std::vector<fo::MenuItem> m;
     fo::SidebarRow row = r;
+    if (r.id == kConnectRow) {
+        // Files: "Conectar a servidor…".
+        m.push_back(fo::MenuItem(fo::tr("Connect to server\xE2\x80\xA6"), "", [this] { connect_server(); })
+                        .with_icon("plus"));
+        fo::PopupMenu::open_at(this, x, y, m);
+        return;
+    }
     m.push_back(fo::MenuItem(fo::tr("Open"), "Enter", [this, row] { activate_row(row); }));
     bool local = !r.id.empty() && r.id[0] == '/';
+    const GvfsShare *share = nullptr;
+    for (const auto &s : App::get().places().shares)
+        if (s.path == r.id || (r.id.compare(0, 8, "tailnet:") == 0 && s.protocol == "SFTP" && s.title == r.id.substr(8)))
+            share = &s;
     if (local) {
         std::string id = r.id;
         m.push_back(fo::MenuItem(fo::tr("Open in a new tab"), "Ctrl+Enter", [this, id] { new_tab(id); }));
@@ -1327,14 +1505,16 @@ void MainWindow::sidebar_context(const fo::SidebarRow &r, int x, int y) {
             open_split();
             dual_->navigate(id);
         }));
-        bool pinned = false;
-        for (const auto &p : App::get().places().pinned)
-            pinned = pinned || p.path == id;
-        if (pinned)
+        if (r.section == marks_sec_)
             m.push_back(fo::MenuItem(fo::tr("Unpin"), "Ctrl+D", [this, id] { active_pane()->toggle_pin(id); }));
         m.push_back(fo::MenuItem(fo::tr("Terminal here"), "Ctrl+.", [id] { open_terminal(id); }));
     }
-    if (r.ejectable) {
+    if (share) {
+        std::string path = share->path;
+        m.push_back(fo::MenuItem::separator());
+        m.push_back(fo::MenuItem(fo::tr("Disconnect"), "", [this, path] { disconnect_share(path); })
+                        .with_icon("eject"));
+    } else if (r.ejectable) {
         m.push_back(fo::MenuItem::separator());
         m.push_back(fo::MenuItem(fo::tr("Eject"), "", [this, row] {
             App::get().devices().eject(row.id, [this, row](bool ok, const std::string &, const std::string &err) {
@@ -1343,6 +1523,19 @@ void MainWindow::sidebar_context(const fo::SidebarRow &r, int x, int y) {
                                 3, ok ? fo::Toast::Info : fo::Toast::Error);
             });
         }));
+    }
+    // Files' "Mover arriba" / "Mover abajo" for places, devices and bookmarks.
+    std::vector<fo::SidebarRow> sibs = reorder_siblings(r);
+    int at = -1;
+    for (std::size_t i = 0; i < sibs.size(); ++i)
+        if (sibs[i].id == r.id)
+            at = int(i);
+    if (at >= 0 && sibs.size() > 1) {
+        m.push_back(fo::MenuItem::separator());
+        if (at > 0)
+            m.push_back(fo::MenuItem(fo::tr("Move up"), "", [this, row, at] { reorder_row(row, at - 1); }));
+        if (at + 1 < int(sibs.size()))
+            m.push_back(fo::MenuItem(fo::tr("Move down"), "", [this, row, at] { reorder_row(row, at + 1); }));
     }
     remap_menu_keys(m);
     fo::PopupMenu::open_at(this, x, y, m);

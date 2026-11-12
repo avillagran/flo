@@ -14,7 +14,9 @@
 #   /run/media/flo/FLO USB (RUN_DIR/run-media inside the sandbox).
 # - FLO_TEST_FAKE_GVFS: SFTP mounts land in RUN_DIR/runtime/gvfs (where
 #   GVfs would put them) after the real GMountOperation prompts (password
-#   "flo-test"); studio's has a few files.
+#   "flo-test"); studio's has a few files, and an SMB share
+#   (fotos on nas) is already connected, for the Network section's
+#   Disconnect and "Connect…".
 # - Two private applications for JPEG pictures (for Open With), which log
 #   the files they are asked to open.
 set -eu
@@ -62,6 +64,7 @@ EOF
 chmod 0700 "$run/bin/tailscale" "$run/bin/dropbox-cli" "$run/bin/localsend"
 
 printf 'Remote notes\n' > "$run/runtime/gvfs/sftp:host=studio.tail1.ts.net/srv/README"
+mkdir -p "$run/runtime/gvfs/smb-share:server=nas,share=fotos,user=ana/2026"
 printf 'Shared with the team\n' > "$h/Dropbox/plan.txt"
 cp "$h/Pictures/Lisbon 2026/IMG_0001.jpg" "$h/Dropbox/cover.jpg"
 

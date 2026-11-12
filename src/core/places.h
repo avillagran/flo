@@ -59,6 +59,11 @@ bool is_pinned(const std::string &path, const std::string &file = bookmarks_path
 // kept as they were). Returns "" or a sentence saying why not.
 std::string pin(const std::string &path, const std::string &file = bookmarks_path());
 bool unpin(const std::string &path, const std::string &file = bookmarks_path());
+// Files' bookmark reordering (Op::Move): moves the bookmark of `path` to
+// `index` among the Bookmarks section's rows (pinned(), the moved one left
+// out). Only that line moves; remote and other lines keep their places.
+// Returns "" or a sentence saying why not.
+std::string move_bookmark(const std::string &path, std::size_t index, const std::string &file = bookmarks_path());
 // Files' favorite labels: sets the GTK label of a local bookmark ("" goes
 // back to the folder's name). The folder itself is never renamed. Returns
 // "" or a sentence saying why not (not a favorite, too long, a line break).
