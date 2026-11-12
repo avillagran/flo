@@ -2088,8 +2088,8 @@ void Pane::draw() {
     draw_children();
     if (dual_) {
         // Files' dual footer: visible and loaded counts, the marks, Tab.
-        std::string foot = fo::i18n::arg(fo::tr("%1 visible"), std::to_string(model_.count())) + " \xC2\xB7 " +
-                           fo::i18n::arg(fo::tr("%1 loaded"), std::to_string(unfiltered_count())) + " \xC2\xB7 " +
+        std::string foot = fo::trn("%n visible", model_.count()) + " / " +
+                           fo::trn("%n loaded", unfiltered_count()) + " \xC2\xB7 " +
                            fo::trn("%n marked", files()->selection_count());
         if (win_->active_pane() == this)
             foot += std::string(" \xC2\xB7 ") + fo::tr("Tab switches pane");

@@ -175,17 +175,17 @@ std::string PropertiesDialog::contents_line() const {
         summary = fo::tr("calculating\xE2\x80\xA6");
     } else {
         const props::Census &c = census_;
-        summary = args(fo::tr("%1 · %2 files, %3 folders"),
-                       {si_size(c.bytes), std::to_string(c.files), std::to_string(c.folders)});
+        summary = si_size(c.bytes) + " \xC2\xB7 " + fo::trn("%n files", (long long)c.files) + ", " +
+                  fo::trn("%n folders", (long long)c.folders);
         if (c.links > 0)
-            summary += fo::i18n::arg(fo::tr(", %1 links (not followed)"), std::to_string(c.links));
+            summary += fo::trn(", %n links (not followed)", (long long)c.links);
         if (!c.complete) {
             summary += fo::tr(" \xC2\xB7 PARTIAL");
             if (c.unreadable > 0)
                 summary += fo::i18n::arg(fo::tr(": %1 without read permission"), std::to_string(c.unreadable));
         }
     }
-    return selection ? args(fo::tr("Selection of %1 objects: %2"), {std::to_string(objects_.size()), summary})
+    return selection ? fo::i18n::arg(fo::trn("Selection of %n objects: %1", (long long)objects_.size()), summary)
                      : fo::i18n::arg(fo::tr("Contents: %1"), summary);
 }
 
