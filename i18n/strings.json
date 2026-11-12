@@ -20,6 +20,10 @@
   "plural": false
  },
  {
+  "source": "%1 disconnected",
+  "plural": false
+ },
+ {
   "source": "%1 file",
   "plural": false
  },
@@ -37,10 +41,6 @@
  },
  {
   "source": "%1 h ago",
-  "plural": false
- },
- {
-  "source": "%1 loaded",
   "plural": false
  },
  {
@@ -64,6 +64,10 @@
   "plural": false
  },
  {
+  "source": "%1 on %2",
+  "plural": false
+ },
+ {
   "source": "%1 previews the selected file; Esc returns to the folder. %2 opens the actions of the focused item.",
   "plural": false
  },
@@ -77,10 +81,6 @@
  },
  {
   "source": "%1 will be deleted permanently. This can't be undone.",
-  "plural": false
- },
- {
-  "source": "%1 · %2 files, %3 folders",
   "plural": false
  },
  {
@@ -108,7 +108,15 @@
   "plural": true
  },
  {
+  "source": "%n folders",
+  "plural": true
+ },
+ {
   "source": "%n items",
+  "plural": true
+ },
+ {
+  "source": "%n items removed from Recents",
   "plural": true
  },
  {
@@ -121,6 +129,10 @@
  },
  {
   "source": "%n items will be deleted permanently. This can't be undone.",
+  "plural": true
+ },
+ {
+  "source": "%n loaded",
   "plural": true
  },
  {
@@ -144,12 +156,16 @@
   "plural": true
  },
  {
+  "source": "%n visible",
+  "plural": true
+ },
+ {
   "source": "(no application)",
   "plural": false
  },
  {
-  "source": ", %1 links (not followed)",
-  "plural": false
+  "source": ", %n links (not followed)",
+  "plural": true
  },
  {
   "source": ": %1 without read permission",
@@ -233,6 +249,18 @@
  },
  {
   "source": "Bookmarks",
+  "plural": false
+ },
+ {
+  "source": "Borders: Omarchy",
+  "plural": false
+ },
+ {
+  "source": "Borders: Rounded",
+  "plural": false
+ },
+ {
+  "source": "Borders: Square",
   "plural": false
  },
  {
@@ -360,7 +388,19 @@
   "plural": false
  },
  {
+  "source": "Connect to server…",
+  "plural": false
+ },
+ {
+  "source": "Connected to %1",
+  "plural": false
+ },
+ {
   "source": "Connecting to %1…",
+  "plural": false
+ },
+ {
+  "source": "Connect…",
   "plural": false
  },
  {
@@ -420,7 +460,15 @@
   "plural": false
  },
  {
+  "source": "Couldn't disconnect",
+  "plural": false
+ },
+ {
   "source": "Couldn't get a Dropbox link for %1: %2",
+  "plural": false
+ },
+ {
+  "source": "Couldn't remove it from Recents",
   "plural": false
  },
  {
@@ -521,6 +569,14 @@
  },
  {
   "source": "Devices",
+  "plural": false
+ },
+ {
+  "source": "Disconnect",
+  "plural": false
+ },
+ {
+  "source": "Disconnecting %1…",
   "plural": false
  },
  {
@@ -740,6 +796,22 @@
   "plural": false
  },
  {
+  "source": "gio didn't answer in time",
+  "plural": false
+ },
+ {
+  "source": "gio failed",
+  "plural": false
+ },
+ {
+  "source": "gio isn't installed",
+  "plural": false
+ },
+ {
+  "source": "Go back",
+  "plural": false
+ },
+ {
   "source": "Go home",
   "plural": false
  },
@@ -908,6 +980,10 @@
   "plural": false
  },
  {
+  "source": "Missing the server: smb://server/share",
+  "plural": false
+ },
+ {
   "source": "Modified: %1",
   "plural": false
  },
@@ -921,6 +997,10 @@
  },
  {
   "source": "Move %1 to:",
+  "plural": false
+ },
+ {
+  "source": "Move down",
   "plural": false
  },
  {
@@ -945,6 +1025,10 @@
  },
  {
   "source": "Move to…",
+  "plural": false
+ },
+ {
+  "source": "Move up",
   "plural": false
  },
  {
@@ -1160,6 +1244,10 @@
   "plural": false
  },
  {
+  "source": "Path: %1",
+  "plural": false
+ },
+ {
   "source": "Pause",
   "plural": false
  },
@@ -1304,11 +1392,19 @@
   "plural": false
  },
  {
+  "source": "Remove from Recents (the file is not deleted)",
+  "plural": false
+ },
+ {
   "source": "Remove from starred",
   "plural": false
  },
  {
   "source": "Remove from Starred (the file is not deleted)",
+  "plural": false
+ },
+ {
+  "source": "Removed from Recents: %1 · the file was not touched",
   "plural": false
  },
  {
@@ -1369,6 +1465,10 @@
  },
  {
   "source": "Resume",
+  "plural": false
+ },
+ {
+  "source": "Run",
   "plural": false
  },
  {
@@ -1440,8 +1540,8 @@
   "plural": false
  },
  {
-  "source": "Selection of %1 objects: %2",
-  "plural": false
+  "source": "Selection of %n objects: %1",
+  "plural": true
  },
  {
   "source": "Selection tools",
@@ -1640,7 +1740,19 @@
   "plural": false
  },
  {
+  "source": "The address can't have spaces or control characters: use %20",
+  "plural": false
+ },
+ {
+  "source": "The address is too long",
+  "plural": false
+ },
+ {
   "source": "The application couldn't be started.",
+  "plural": false
+ },
+ {
+  "source": "The bookmark no longer exists.",
   "plural": false
  },
  {
@@ -1672,6 +1784,10 @@
   "plural": false
  },
  {
+  "source": "The location is still in use: close the files open in it",
+  "plural": false
+ },
+ {
   "source": "The object changed since it was read; reload before applying.",
   "plural": false
  },
@@ -1689,6 +1805,10 @@
  },
  {
   "source": "Theme: System (live)",
+  "plural": false
+ },
+ {
+  "source": "Theme: Tokyo Night (local view)",
   "plural": false
  },
  {
@@ -1748,6 +1868,10 @@
   "plural": false
  },
  {
+  "source": "Type smb://, sftp://, ftp://, dav:// or nfs:// and the server · Enter connects",
+  "plural": false
+ },
+ {
   "source": "Type to filter: *.pdf, ext:md, type:dir, !draft",
   "plural": false
  },
@@ -1796,6 +1920,14 @@
   "plural": false
  },
  {
+  "source": "Use current context",
+  "plural": false
+ },
+ {
+  "source": "Use smb://, sftp://, ftp://, ftps://, dav://, davs://, nfs:// or afp://",
+  "plural": false
+ },
+ {
   "source": "User",
   "plural": false
  },
@@ -1829,6 +1961,10 @@
  },
  {
   "source": "Wait for the load",
+  "plural": false
+ },
+ {
+  "source": "Wait for the network connection in progress",
   "plural": false
  },
  {

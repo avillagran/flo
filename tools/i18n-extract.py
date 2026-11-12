@@ -51,6 +51,11 @@ DYNAMIC = [
     "%1 renames the focused item; %2 undoes it.",
     "%1 previews the selected file; Esc returns to the folder. %2 opens the actions of the focused item.",
     "the command palette",
+    # Files' network locations (core/network.cpp reasons) and bookmark moves.
+    "Use smb://, sftp://, ftp://, ftps://, dav://, davs://, nfs:// or afp://", "The address is too long",
+    "The address can't have spaces or control characters: use %20", "Missing the server: smb://server/share",
+    "The location is still in use: close the files open in it", "gio isn't installed", "Couldn't disconnect",
+    "gio didn't answer in time", "gio failed", "The bookmark no longer exists.",
 ]
 
 call = re.compile(r'\b(?:fo::)?(trn?)\(\s*((?:"(?:[^"\\]|\\.)*"\s*)+)')
