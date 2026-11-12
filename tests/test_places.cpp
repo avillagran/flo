@@ -129,6 +129,18 @@ TEST(recents_read_and_add) {
     CHECK(!recents::add(d + "/old.txt", "text/plain", d + "/bad.xbel"));
     CHECK_EQ(read_file(d + "/bad.xbel"), std::string("<xbel><bookmark"));
     CHECK(path_inside(recents::xbel_path(), std::getenv("FLO_TEST_RUN")));
+    // Files' "Remove from Recents": the entry goes, the file and the other
+    // entries (another app's web page too) stay.
+    CHECK_EQ(recents::remove({d + "/new.pdf"}, xbel), 1);
+    CHECK_EQ(read_file(d + "/new.pdf"), std::string("n"));
+    all = recents::read(xbel);
+    CHECK_EQ(all.size(), static_cast<std::size_t>(3));
+    for (const auto &r : all)
+        CHECK(r.path != d + "/new.pdf");
+    CHECK(read_file(xbel).find("https://example.com/") != std::string::npos);
+    CHECK_EQ(recents::remove({d + "/new.pdf"}, xbel), 0);
+    CHECK_EQ(recents::remove({d + "/old.txt"}, d + "/bad.xbel"), -1);
+    CHECK_EQ(read_file(d + "/bad.xbel"), std::string("<xbel><bookmark"));
 }
 
 TEST(tailscale_status_parsing) {

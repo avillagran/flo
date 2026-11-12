@@ -33,4 +33,10 @@ Listing list(const std::string &xbel, bool show_hidden, std::size_t limit = 200,
 // writing the file atomically with mode 0600.
 bool add(const std::string &path, const std::string &mime, const std::string &xbel = xbel_path());
 
+// Files' "Remove from Recents": takes the entries of these local paths off
+// the list (the files are never opened or changed). Other apps' entries
+// stay; a file GLib can't read back whole is left untouched. Returns how
+// many entries went, or -1 when the file couldn't be changed.
+int remove(const std::vector<std::string> &paths, const std::string &xbel = xbel_path());
+
 } // namespace flo::recents

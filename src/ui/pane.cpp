@@ -1135,8 +1135,29 @@ void Pane::delete_selected() {
         }
         return;
     }
-    if (in_recents())
+    if (in_recents()) {
+        // Files: Delete takes the entries off Recents; the files stay.
+        auto result = std::make_shared<int>(0);
+        MainWindow *win = win_;
+        fo::tasks::run([paths, result] { *result = recents::remove(paths); },
+                       [win, paths, result] {
+                           // The watcher reloads the list; the toast only
+                           // while the window is still open.
+                           const auto &all = App::get().windows();
+                           if (std::find(all.begin(), all.end(), win) == all.end())
+                               return;
+                           const int n = *result;
+                           if (n < 0)
+                               fo::Toast::show(win, fo::tr("Couldn't remove it from Recents"), 3, fo::Toast::Error);
+                           else if (n > 0)
+                               fo::Toast::show(win, paths.size() == 1
+                                                         ? fo::i18n::arg(fo::tr("Removed from Recents: %1 \xC2\xB7 the file was not touched"),
+                                                                         path_basename(paths[0]))
+                                                         : fo::trn("%n items removed from Recents", int(paths.size())),
+                                               3);
+                       });
         return;
+    }
     if (in_trash())
         confirm_delete(paths);
     else
@@ -1569,6 +1590,11 @@ std::vector<fo::MenuItem> Pane::menu_for(int index, FolderModel *where, const st
                         .disabled(!is_dir(path_dirname(target))));
         if (folder == kStarred)
             m.push_back(MenuItem(fo::tr("Remove from Starred (the file is not deleted)"), "Delete", [this, target] {
+                select_path(target);
+                delete_selected();
+            }).with_icon("x"));
+        else
+            m.push_back(MenuItem(fo::tr("Remove from Recents (the file is not deleted)"), "Delete", [this, target] {
                 select_path(target);
                 delete_selected();
             }).with_icon("x"));
