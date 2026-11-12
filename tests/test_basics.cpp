@@ -189,3 +189,21 @@ TEST(atomic_write_and_capped_read) {
     CHECK(!read_file_capped(d + "/link", 100, out, false));
     CHECK(read_file_capped(d + "/link", 100, out, true));
 }
+
+// Files' "Interface borders" and "Theme" preferences, kept in [view].
+TEST(settings_keep_files_look_preferences) {
+    const std::string d = private_dir("look-settings");
+    Settings s;
+    CHECK_EQ(s.corners, std::string("omarchy"));
+    CHECK(!s.local_theme);
+    s.corners = "rounded";
+    s.local_theme = true;
+    CHECK(s.save(d + "/flo.conf"));
+    const std::string text = read_file(d + "/flo.conf");
+    CHECK(text.find("corners=rounded") != std::string::npos && text.find("theme=tokyo-night") != std::string::npos);
+    Settings back = Settings::load(d + "/flo.conf");
+    CHECK(back.corners == "rounded" && back.local_theme);
+    write_file(d + "/bad.conf", "[view]\ncorners=wobbly\ntheme=neon\n");
+    Settings bad = Settings::load(d + "/bad.conf");
+    CHECK(bad.corners == "omarchy" && !bad.local_theme);
+}

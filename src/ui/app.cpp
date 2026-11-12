@@ -321,6 +321,7 @@ int App::run(const std::string &folder, const std::string &select, bool restore)
     fo::InitOptions opts;
     opts.app_class = "flo";
     fo::init(opts);
+    apply_look(settings_);
     g_prev_dispatch = Fl::event_dispatch();
     Fl::event_dispatch(flo_dispatch);
 

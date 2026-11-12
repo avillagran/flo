@@ -1236,8 +1236,25 @@ std::vector<fo::MenuItem> MainWindow::preferences_items() {
             App::get().open_window(active_pane()->in_recents() ? xdg::home() : active_pane()->folder(), {});
         }).with_icon("external-link"),
     };
+    // Files' "Bordes de la interfaz" and "Tema" (view.rs preferences).
+    auto look_set = [](std::string corners, int local) {
+        return [corners, local] {
+            Settings &st = App::get().settings();
+            if (!corners.empty())
+                st.corners = corners;
+            if (local >= 0)
+                st.local_theme = local == 1;
+            App::get().save_settings();
+            apply_look(st);
+        };
+    };
     std::vector<MenuItem> look = {
-        MenuItem(fo::tr("Theme: System (live)"), "", nullptr).check(true),
+        MenuItem(fo::tr("Borders: Omarchy"), "", look_set("omarchy", -1)).check(s.corners == "omarchy"),
+        MenuItem(fo::tr("Borders: Square"), "", look_set("square", -1)).check(s.corners == "square"),
+        MenuItem(fo::tr("Borders: Rounded"), "", look_set("rounded", -1)).check(s.corners == "rounded"),
+        MenuItem::separator(),
+        MenuItem(fo::tr("Theme: System (live)"), "", look_set("", 0)).check(!s.local_theme),
+        MenuItem(fo::tr("Theme: Tokyo Night (local view)"), "", look_set("", 1)).check(s.local_theme),
     };
     std::vector<MenuItem> help = {
         MenuItem(dual_ ? fo::tr("Save only this group") : fo::tr("Save session"), "",

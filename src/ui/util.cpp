@@ -104,6 +104,13 @@ std::string when_text(int64_t mtime_ns) {
     return fo::i18n::format_when(std::time_t(mtime_ns / 1000000000));
 }
 
+void apply_look(const Settings &s) {
+    // Files: Square is 0, Rounded rounds every widget, Omarchy follows
+    // Hyprland's decoration:rounding.
+    const int radius = s.corners == "square" ? 0 : s.corners == "rounded" ? 8 : -1;
+    fo::theme_overrides(radius, s.local_theme);
+}
+
 std::string place_icon(const std::string &icon) {
     static const std::map<std::string, std::string> m = {
         {"home", "home"},          {"documents", "file-text"}, {"downloads", "download"},

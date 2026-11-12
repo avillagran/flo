@@ -3,6 +3,7 @@
 #pragma once
 
 #include "core/entry.h"
+#include "core/settings.h"
 
 #include "fltk-omarchy/theme.h"
 
@@ -52,6 +53,8 @@ std::string size_text(const Entry &e);
 std::string when_text(int64_t mtime_ns);
 // The sidebar icon for a Place::icon.
 std::string place_icon(const std::string &icon);
+// Files' "Interface borders" and "Theme" preferences over the live theme.
+void apply_look(const Settings &s);
 // "/home/me/Pictures" -> "~/Pictures".
 std::string tilde(const std::string &path);
 // Folio's typed paths: "~", "~/x", absolute, or relative to `cwd`.
