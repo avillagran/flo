@@ -42,13 +42,15 @@ bool command_matches(const std::string &query, const std::string &text) {
 }
 
 CommandPalette *CommandPalette::open(fo::Window *win, const std::string &title, const std::string &placeholder,
-                                     std::vector<Command> commands, const std::string &query) {
+                                     std::vector<Command> commands, const std::string &query,
+                                     std::function<std::vector<Command>()> recapture) {
     if (!win)
         return nullptr;
     auto *p = new CommandPalette();
     p->title_ = title;
     p->placeholder_ = placeholder;
     p->all_ = std::move(commands);
+    p->recapture_ = std::move(recapture);
     p->begin();
     p->field_ = new fo::TextField(0, 0, 100, kFieldH);
     p->end();
@@ -106,6 +108,32 @@ void CommandPalette::run(int i) {
         defer(c.run);
 }
 
+bool CommandPalette::runnable() const {
+    return hi_ >= 0 && hi_ < int(shown_.size()) && all_[size_t(shown_[size_t(hi_)])].enabled;
+}
+
+void CommandPalette::use_current_context() {
+    if (!recapture_)
+        return;
+    // Keep the highlighted entry when it is still there.
+    std::string label = hi_ >= 0 && hi_ < int(shown_.size()) ? all_[size_t(shown_[size_t(hi_)])].label : "";
+    all_ = recapture_();
+    refilter();
+    for (size_t i = 0; i < shown_.size(); ++i)
+        if (all_[size_t(shown_[i])].label == label)
+            hi_ = int(i);
+    redraw();
+}
+
+// Files' footer buttons (command_palette.rs): Run 132 px, then Use current
+// context up to 206 px, 40 px from the bottom.
+static void footer_buttons(int cx, int cy, int cw, int ch, int &rx, int &ux, int &uw, int &by) {
+    rx = cx + kPad;
+    by = cy + ch - 40;
+    ux = rx + 144;
+    uw = std::min(cw - 2 * kPad - 144, 206);
+}
+
 void CommandPalette::place() {
     // Files' palette covers the window under the header.
     cx_ = 0;
@@ -114,7 +142,7 @@ void CommandPalette::place() {
     ch_ = std::max(120, h() - 58 - 32);
     field_->resize(cx_ + kPad, cy_ + 56, std::min(cw_ - 2 * kPad, 760), kFieldH);
     list_y_ = cy_ + 56 + kFieldH + 34;
-    rows_ = std::max(1, (cy_ + ch_ - 40 - list_y_) / kRowH);
+    rows_ = std::max(1, (cy_ + ch_ - 80 - list_y_) / kRowH);
 }
 
 void CommandPalette::relayout() { place(); }
@@ -126,6 +154,15 @@ int CommandPalette::handle(int event) {
         if (ey < cy_ || ey >= cy_ + ch_ ||
             (ey < cy_ + 40 && ex >= cx_ + cw_ - kPad - 80)) { // outside, or "× Esc"
             close();
+            return 1;
+        }
+        int rx, ux, uw, by;
+        footer_buttons(cx_, cy_, cw_, ch_, rx, ux, uw, by);
+        if (ey >= by && ey < by + 28) {
+            if (ex >= rx && ex < rx + 132 && runnable())
+                run(hi_);
+            else if (ex >= ux && ex < ux + uw)
+                use_current_context();
             return 1;
         }
         if (ey >= list_y_ && ey < list_y_ + rows_ * kRowH) {
@@ -185,7 +222,19 @@ void CommandPalette::draw() {
     }
     fl_pop_clip();
     fo::text::draw(fo::tr("\xE2\x86\x91\xE2\x86\x93 or wheel \xC2\xB7 Enter runs \xC2\xB7 Esc closes"), cx_ + kPad,
-                   cy_ + ch_ - 34, cw_ - 2 * kPad, 24, t.dim(), fo::text::REGULAR, 11);
+                   cy_ + ch_ - 72, cw_ - 2 * kPad, 22, t.dim(), fo::text::REGULAR, 11);
+    int rx, ux, uw, by;
+    footer_buttons(cx_, cy_, cw_, ch_, rx, ux, uw, by);
+    const int r = t.radius() > 0 ? 4 : 0;
+    const bool can = runnable();
+    fo::paint::round_fill(rx, by, 132, 28, r, can ? t.card() : t.background());
+    fo::icon::draw("play", rx + 8, by + 7, 14, can ? t.accent() : t.muted());
+    fo::text::draw(fo::tr("Run"), rx + 28, by, 96, 28, can ? t.accent() : t.muted(), fo::text::REGULAR, 12);
+    if (uw > 40) {
+        fo::paint::round_fill(ux, by, uw, 28, r, t.card());
+        fo::icon::draw("refresh-cw", ux + 8, by + 7, 14, t.accent());
+        fo::text::draw(fo::tr("Use current context"), ux + 28, by, uw - 36, 28, t.accent(), fo::text::REGULAR, 12);
+    }
 }
 
 } // namespace flo::ui

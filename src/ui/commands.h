@@ -2,7 +2,9 @@
 // places catalog (Ctrl+L then ":"): a searchable list over the window,
 // each entry with its shortcut under it. Up/Down or the wheel move,
 // Enter runs the highlighted entry (never the first match on its own),
-// Esc closes.
+// Esc closes. Files' footer buttons: Run (the highlighted entry, muted
+// when it can't run) and Use current context (rebuilds the entries from
+// the window as it is now, through `recapture`).
 #pragma once
 
 #include "fltk-omarchy/window.h"
@@ -26,7 +28,8 @@ struct Command {
 class CommandPalette : public fo::Layer {
 public:
     static CommandPalette *open(fo::Window *win, const std::string &title, const std::string &placeholder,
-                                std::vector<Command> commands, const std::string &query = {});
+                                std::vector<Command> commands, const std::string &query = {},
+                                std::function<std::vector<Command>()> recapture = {});
     void draw() override;
     int handle(int event) override;
     void relayout() override;
@@ -38,6 +41,9 @@ private:
     void place();
     std::string title_, placeholder_;
     std::vector<Command> all_;
+    std::function<std::vector<Command>()> recapture_;
+    void use_current_context();
+    bool runnable() const;
     std::vector<int> shown_;
     int hi_ = 0, top_ = 0;
     fo::TextField *field_ = nullptr;

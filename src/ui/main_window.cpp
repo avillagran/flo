@@ -1033,37 +1033,45 @@ void MainWindow::run_omnibar(const std::string &text) {
     if (!text.empty() && text[0] == '>' ) {
         std::string q = text.substr(1);
         end_field(false);
-        std::vector<Command> cmds;
-        auto add = [&](const std::vector<fo::MenuItem> &items, auto &self) -> void {
-            for (const auto &it : items) {
-                if (it.is_separator)
-                    continue;
-                if (!it.submenu.empty())
-                    self(it.submenu, self);
-                else if (it.action)
-                    cmds.push_back({it.label, it.shortcut, it.icon, it.action, it.enabled});
-            }
+        // Rebuilt on "Use current context" with the window as it is then.
+        auto build = [this] {
+            std::vector<Command> cmds;
+            auto add = [&](const std::vector<fo::MenuItem> &items, auto &self) -> void {
+                for (const auto &it : items) {
+                    if (it.is_separator)
+                        continue;
+                    if (!it.submenu.empty())
+                        self(it.submenu, self);
+                    else if (it.action)
+                        cmds.push_back({it.label, it.shortcut, it.icon, it.action, it.enabled});
+                }
+            };
+            std::vector<fo::MenuItem> actions = actions_items(), prefs = preferences_items();
+            remap_menu_keys(actions);
+            remap_menu_keys(prefs);
+            add(actions, add);
+            add(prefs, add);
+            return cmds;
         };
-        std::vector<fo::MenuItem> actions = actions_items(), prefs = preferences_items();
-        remap_menu_keys(actions);
-        remap_menu_keys(prefs);
-        add(actions, add);
-        add(prefs, add);
-        CommandPalette::open(this, fo::tr("Commands"), fo::tr("Search command or shortcut\xE2\x80\xA6"), cmds, q);
+        CommandPalette::open(this, fo::tr("Commands"), fo::tr("Search command or shortcut\xE2\x80\xA6"), build(), q,
+                             build);
         return;
     }
     if (!text.empty() && text[0] == ':') {
         std::string q = text.substr(1);
         end_field(false);
-        std::vector<Command> places;
-        for (const auto &r : rail_->rows()) {
-            if (r.id.empty())
-                continue;
-            fo::SidebarRow row = r;
-            places.push_back({r.label, r.id[0] == '/' ? tilde(r.id) : std::string(), r.icon,
-                              [this, row] { activate_row(row); }, true});
-        }
-        CommandPalette::open(this, fo::tr("Places"), fo::tr("Search a place\xE2\x80\xA6"), places, q);
+        auto build = [this] {
+            std::vector<Command> places;
+            for (const auto &r : rail_->rows()) {
+                if (r.id.empty())
+                    continue;
+                fo::SidebarRow row = r;
+                places.push_back({r.label, r.id[0] == '/' ? tilde(r.id) : std::string(), r.icon,
+                                  [this, row] { activate_row(row); }, true});
+            }
+            return places;
+        };
+        CommandPalette::open(this, fo::tr("Places"), fo::tr("Search a place\xE2\x80\xA6"), build(), q, build);
         return;
     }
     // "./>name" and "./:name" stay literal paths.
