@@ -106,11 +106,13 @@ EOF
     sed -i "s|--bind \"$run\" \"$run\"|--bind \"$run\" \"$run\" --bind \"$run/run-media\" /run/media|" "$run/sandbox.sh"
   fi
   # Xvfb compiles its keymap into /tmp: a private /tmp keeps it off the
-  # host's (only the X socket directory is shared).
-  bwrap --dev-bind / / --tmpfs /tmp --bind /tmp/.X11-unix /tmp/.X11-unix --die-with-parent \
-    Xvfb ":$disp" -screen 0 "${FLO_SESSION_SCREEN:-1440x900x24}" -nolisten tcp > "$run/xvfb.log" 2>&1 &
+  # host's (only the X socket directory is shared). A waiting shell is its
+  # parent, so stopping that shell stops the server.
+  sh -c 'bwrap --dev-bind / / --tmpfs /tmp --bind /tmp/.X11-unix /tmp/.X11-unix --die-with-parent \
+    Xvfb ":$1" -screen 0 "$2" -nolisten tcp; true' sh "$disp" "${FLO_SESSION_SCREEN:-1440x900x24}" \
+    > "$run/xvfb.log" 2>&1 &
   echo $! > "$run/xvfb.pid"
-  sleep 1
+  sleep 1.5
   # bwrap dies with its parent: a waiting shell keeps it alive past this
   # script, and stopping that shell stops the sandbox.
   sh -c '"$1/sandbox.sh" "$2" "$3"; true' sh "$run" "$app" "${3:-$h}" > "$run/flo.log" 2>&1 &

@@ -170,6 +170,17 @@ void App::window_closed(MainWindow *w) {
     Fl::delete_widget(w);
 }
 
+ServerScan &App::server_scan() {
+    if (!server_scan_)
+        server_scan_ = std::make_unique<ServerScan>(*queue_);
+    return *server_scan_;
+}
+
+void App::remember_server(const std::string &uri) {
+    flo::remember_server(settings_.recent_servers, uri);
+    save_settings();
+}
+
 void App::shortcuts_changed() {
     for (MainWindow *w : windows_)
         w->shortcuts_changed();
@@ -405,6 +416,7 @@ int App::run_portal() {
     }
     save_settings();
     portal_.reset();
+    server_scan_.reset();
     sizes_.reset();
     thumbs_.reset();
     thumb_service_.reset();
@@ -466,6 +478,7 @@ int App::run(const std::string &folder, const std::string &select, bool restore)
     save_settings();
     // Services stop before the queue goes.
     dbus_.reset();
+    server_scan_.reset();
     sizes_.reset();
     thumbs_.reset();
     thumb_service_.reset();

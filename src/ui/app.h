@@ -12,6 +12,7 @@
 #include "core/network.h"
 #include "core/places.h"
 #include "core/portal_service.h"
+#include "core/server_scan.h"
 #include "core/process.h"
 #include "core/settings.h"
 #include "core/thumbnail_service.h"
@@ -86,6 +87,12 @@ public:
     Watcher &watcher() { return *watcher_; }
     Devices &devices() { return *devices_; }
     Network &network() { return *network_; }
+    // The Connect dialog's discovery (made at the first use) and what the
+    // last scan found, shown at once the next time the dialog opens.
+    ServerScan &server_scan();
+    std::vector<FoundServer> &found_servers() { return found_servers_; }
+    // A server connected to: first in the Connect dialog's recent list.
+    void remember_server(const std::string &uri);
     Settings &settings() { return settings_; }
     // Files' saved folder views (read once, at the first use).
     FolderViews &folder_views();
@@ -143,6 +150,8 @@ private:
     std::unique_ptr<Network> network_;
     std::unique_ptr<DBusService> dbus_;
     std::unique_ptr<PortalService> portal_;
+    std::unique_ptr<ServerScan> server_scan_;
+    std::vector<FoundServer> found_servers_;
     void init_services();
     Settings settings_;
     FolderViews folder_views_;

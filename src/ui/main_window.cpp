@@ -14,6 +14,7 @@
 #include "core/xdg.h"
 #include "ui/app.h"
 #include "ui/commands.h"
+#include "ui/connect_dialog.h"
 #include "ui/details.h"
 #include "ui/favorites.h"
 #include "ui/operation_bar.h"
@@ -903,15 +904,12 @@ void MainWindow::edit_path() {
 }
 
 void MainWindow::connect_server() {
-    // Files' connect_server_prompt (network_ui.rs): the location field
-    // starts with smb://, the cursor at its end.
-    const std::string start = "smb://";
-    field_mode_ = Field::Path;
-    field_->placeholder(fo::tr("A path, >command or :place"));
-    field_->set_text(start, int(start.size()), int(start.size()));
-    layout();
-    field_->take_focus();
-    status_->left(fo::tr("Type smb://, sftp://, ftp://, dav:// or nfs:// and the server \xC2\xB7 Enter connects"));
+    // Files' "Connect…" (network_ui.rs), as a dialog: found and recent
+    // servers, an address field checked like Files' network::parse; the
+    // pane mounts the choice through GVfs.
+    if (field_mode_ != Field::None)
+        end_field(false);
+    ConnectDialog::open(this, [this](const std::string &uri) { active_pane()->go_typed(uri); });
 }
 
 // --- Files' Tab completion in the location field (path_edit.rs) -------------------

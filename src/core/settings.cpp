@@ -154,6 +154,19 @@ void Settings::read_from(const Ini &ini) {
     local_theme = ini.get("view", "theme") == "tokyo-night";
     previous_file_manager = ini.get("defaults", "previous-file-manager");
     previous_file_chooser = ini.get("defaults", "previous-file-chooser");
+    recent_servers.clear();
+    {
+        std::string all = ini.get("network", "recent"), cur;
+        for (char c : all + " ") {
+            if (c == ' ') {
+                if (!cur.empty() && recent_servers.size() < 8)
+                    recent_servers.push_back(cur);
+                cur.clear();
+            } else {
+                cur += c;
+            }
+        }
+    }
 }
 
 void Settings::write_to(Ini &ini) const {
@@ -172,6 +185,12 @@ void Settings::write_to(Ini &ini) const {
     ini.set("window", "maximized", window_maximized ? "true" : "false");
     ini.set("view", "corners", corners);
     ini.set("view", "theme", local_theme ? "tokyo-night" : "system");
+    if (!recent_servers.empty() || ini.has("network", "recent")) {
+        std::string all;
+        for (const auto &u : recent_servers)
+            all += (all.empty() ? "" : " ") + u;
+        ini.set("network", "recent", all);
+    }
     if (!previous_file_manager.empty() || ini.has("defaults", "previous-file-manager"))
         ini.set("defaults", "previous-file-manager", previous_file_manager);
     if (!previous_file_chooser.empty() || ini.has("defaults", "previous-file-chooser"))

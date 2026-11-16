@@ -875,6 +875,7 @@ void Pane::open_uri(const std::string &uri, const std::string &password) {
         App::get().network_job(-1);
         App::get().refresh_shares();
         navigate(landing.empty() ? local : landing);
+        App::get().remember_server(uri); // the Connect dialog's recent servers
         fo::Toast::show(win_, fo::i18n::arg(fo::tr("Connected to %1"), uri), 3);
     };
     cb.on_failed = [this, uri](const std::string &error) {

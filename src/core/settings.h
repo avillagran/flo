@@ -59,6 +59,9 @@ struct Settings {
     // What "Use Flo as the default file manager / file chooser" replaced
     // (default_apps::Previous::encode()), for Restore ([defaults]).
     std::string previous_file_manager, previous_file_chooser;
+    // Servers connected to lately (Connect dialog), newest first
+    // ([network] recent, space separated: checked URIs have no spaces).
+    std::vector<std::string> recent_servers;
 
     static std::string path(); // $XDG_CONFIG_HOME/flo/flo.conf
     // Missing file or keys give the defaults; bad values are ignored.
