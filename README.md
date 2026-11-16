@@ -29,8 +29,10 @@ whose look (Files' look) it carries.
 For desktop standards and plumbing (the freedesktop thumbnail cache and
 trash, GTK bookmarks, Recents, `org.freedesktop.FileManager1`, GVfs/SFTP and
 the tailnet, MTP) Flo follows Omarchy's
-[Folio](https://github.com/omacom/folio). Folio is a technical reference
-only: look, layout, keys and wording are Files'.
+[Folio](https://github.com/omacom/folio). One deliberate exception: the
+**icons** follow Folio's line (its line glyphs, flat folder and per-type
+icons, through the toolkit's Folio icon style; MIT, Copyright (c) 2026
+David Heinemeier Hansson). Layout, keys and wording stay Files'.
 
 ## Status
 
@@ -57,7 +59,23 @@ next and what is left out of this phase.
   selection tools, F2 rename, F7 new folder, Ctrl+N new file, drag and
   drop, the SFTP password prompt, file operations with progress, conflict
   prompts and undo, and F1 for every shortcut. The live Omarchy theme and
-  font (a Nerd Font for the glyph icons) apply throughout.
+  font apply throughout; the icons are Folio's line icons.
+- **Narrow windows**: the header's buttons fold by priority into one
+  button that drops the rest down as a column (hover, click or Preferences
+  → View → Change view), the path chips always show the current folder,
+  and the status bar gives way by priority without overlapping
+  ([screenshots](docs/screenshots/narrow/)).
+- **Connect to server** ("Connect…" in the rail): servers found on the
+  network (GVfs, Avahi, smbclient, whichever are installed; no root),
+  recent servers and an address field, mounted through GVfs.
+- **Text previews**: text and code files show their first lines on a small
+  page in the thumbnail slot (List, Grid, inspector).
+- **File chooser for other programs**: `flo --portal` is an
+  xdg-desktop-portal FileChooser backend (Open, Save, Save several), set up
+  at user level from Preferences → Default applications; see
+  [docs/PORTAL.md](docs/PORTAL.md).
+- **Default applications** (Preferences): use Flo as the default file
+  manager and as the file chooser, each confirmed and reversible.
 - **Preview** (Space) runs as its own process, `flo preview PATH`, so
   decoding a large picture never grows the main window.
 - **flo-core** (`src/core/`, no FLTK): folder listing off the UI thread
@@ -90,7 +108,10 @@ Files (left) and Flo (right), from
 
 More of Flo alone in [docs/screenshots/](docs/screenshots/): drives and
 network, the SFTP prompt, rename, conflict, trash, undo, empty folder,
-shortcuts and the preview.
+shortcuts and the preview; the narrow header at 420, 800 and 1900 px
+(`narrow/`), the Connect dialog, Default applications, the file chooser
+(`picker-open.png`, `picker-save.png`) and Folio's icons before and after
+(`folio-icons/`).
 
 ## Memory
 
@@ -141,7 +162,8 @@ ctest --test-dir build
 ```
 
 To install as a package, `cd packaging && makepkg -si` (desktop entry for
-`inode/directory`, icon, `flo` and `flo-thumbnailer`). The package builds
+`inode/directory`, icon, `flo` and `flo-thumbnailer`, and the file chooser's
+`flo.portal` and D-Bus service, used only when a portals.conf names Flo). The package builds
 cleanly with `BUILDDIR`, `PKGDEST` and `SRCDEST` pointing into `build/`
 (checked 2026-11-11: a 1.5 MiB `flo-0.1.0-1-x86_64.pkg.tar.zst` with all
 translations, FLTK
@@ -161,11 +183,16 @@ binary in the same kind of session (Files, for comparisons) and
 `FLO_SESSION_THEME` copies an Omarchy `colors.toml` in.
 `tools/side-by-side.sh FILES_BINARY COLORS_TOML` takes the Files/Flo pairs
 in `docs/screenshots/files-vs-flo/`, `tools/flo-shots.sh COLORS_TOML` the
-rest.
+rest; `tools/narrow-shots.sh` the narrow header, `tools/feature-shots.sh`
+the Connect dialog, Default applications and the icons, and
+`tools/portal-check.sh` checks the file chooser end to end against the
+system's xdg-desktop-portal in a private bus.
 
 Tests run in a fresh private directory under `build/test-runs/` with their
 own `HOME`, `TMPDIR` and XDG directories; they never touch your files.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE). The icons come from the toolkit: Folio's
+line icons (MIT, Copyright (c) 2026 David Heinemeier Hansson) and Lucide
+(ISC); their notices are in the toolkit's `third_party/`.
