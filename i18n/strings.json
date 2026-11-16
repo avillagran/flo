@@ -12,6 +12,10 @@
   "plural": false
  },
  {
+  "source": "%1 already exists. Saving replaces it.",
+  "plural": false
+ },
+ {
   "source": "%1 can't be opened.",
   "plural": false
  },
@@ -140,6 +144,10 @@
   "plural": true
  },
  {
+  "source": "%n of these names already exist. Saving replaces them.",
+  "plural": true
+ },
+ {
   "source": "%n pending",
   "plural": true
  },
@@ -149,6 +157,10 @@
  },
  {
   "source": "%n queued",
+  "plural": true
+ },
+ {
+  "source": "%n servers found on this network",
   "plural": true
  },
  {
@@ -180,6 +192,10 @@
   "plural": false
  },
  {
+  "source": "A name can't contain \"/\"",
+  "plural": false
+ },
+ {
   "source": "A path, >command or :place",
   "plural": false
  },
@@ -197,6 +213,10 @@
  },
  {
   "source": "Actions on files",
+  "plural": false
+ },
+ {
+  "source": "All files",
   "plural": false
  },
  {
@@ -229,6 +249,14 @@
  },
  {
   "source": "Apply to all",
+  "plural": false
+ },
+ {
+  "source": "Apps that ask the desktop portal for files use %1 now. Flo will be registered as a portal backend for your user and named as the file chooser in %2; the other lines stay. Restart xdg-desktop-portal (systemctl --user restart xdg-desktop-portal) or log in again for apps to use it. You can restore %1 from here.",
+  "plural": false
+ },
+ {
+  "source": "Apps will pick files with %1 again after xdg-desktop-portal restarts.",
   "plural": false
  },
  {
@@ -316,6 +344,10 @@
   "plural": false
  },
  {
+  "source": "Change view",
+  "plural": false
+ },
+ {
   "source": "Clear filter",
   "plural": false
  },
@@ -385,6 +417,10 @@
  },
  {
   "source": "Connect",
+  "plural": false
+ },
+ {
+  "source": "Connect to server",
   "plural": false
  },
  {
@@ -533,6 +569,10 @@
  },
  {
   "source": "Date",
+  "plural": false
+ },
+ {
+  "source": "Default applications",
   "plural": false
  },
  {
@@ -736,6 +776,10 @@
   "plural": false
  },
  {
+  "source": "File chooser: %1",
+  "plural": false
+ },
+ {
   "source": "File · apparent %1",
   "plural": false
  },
@@ -760,6 +804,26 @@
   "plural": false
  },
  {
+  "source": "Flo already opens folders",
+  "plural": false
+ },
+ {
+  "source": "Flo is already the file chooser",
+  "plural": false
+ },
+ {
+  "source": "Flo is now the default file manager",
+  "plural": false
+ },
+ {
+  "source": "Flo is the file chooser now · restart xdg-desktop-portal to apply",
+  "plural": false
+ },
+ {
+  "source": "Flo's program path is unknown.",
+  "plural": false
+ },
+ {
   "source": "Focus an item first",
   "plural": false
  },
@@ -769,6 +833,18 @@
  },
  {
   "source": "Folders include hidden descendants",
+  "plural": false
+ },
+ {
+  "source": "Folders open with %1 now. Flo will open them instead: only the inode/directory entry of ~/.config/mimeapps.list changes. You can restore %1 from Preferences → Default applications.",
+  "plural": false
+ },
+ {
+  "source": "Folders open with: %1",
+  "plural": false
+ },
+ {
+  "source": "Folders will open with %1 again, as before Flo was chosen.",
   "plural": false
  },
  {
@@ -948,6 +1024,10 @@
   "plural": false
  },
  {
+  "source": "Looking for servers on this network…",
+  "plural": false
+ },
+ {
   "source": "Making a preview…",
   "plural": false
  },
@@ -1120,6 +1200,10 @@
   "plural": false
  },
  {
+  "source": "No servers found on this network; type an address below",
+  "plural": false
+ },
+ {
   "source": "No starred items · Ctrl+E stars the focused item in any folder",
   "plural": false
  },
@@ -1136,7 +1220,31 @@
   "plural": false
  },
  {
+  "source": "none",
+  "plural": false
+ },
+ {
+  "source": "Not a valid portal backend.",
+  "plural": false
+ },
+ {
+  "source": "Not a valid type or application.",
+  "plural": false
+ },
+ {
   "source": "Nothing to paste",
+  "plural": false
+ },
+ {
+  "source": "Nothing to restore.",
+  "plural": false
+ },
+ {
+  "source": "Nothing to save",
+  "plural": false
+ },
+ {
+  "source": "Nothing yet: servers you connect to are listed here",
   "plural": false
  },
  {
@@ -1161,6 +1269,10 @@
  },
  {
   "source": "Oldest",
+  "plural": false
+ },
+ {
+  "source": "On this network",
   "plural": false
  },
  {
@@ -1364,6 +1476,10 @@
   "plural": false
  },
  {
+  "source": "Recent servers",
+  "plural": false
+ },
+ {
   "source": "Recents",
   "plural": false
  },
@@ -1436,6 +1552,10 @@
   "plural": false
  },
  {
+  "source": "Replace?",
+  "plural": false
+ },
+ {
   "source": "Replacing moves it to the trash.",
   "plural": false
  },
@@ -1457,6 +1577,22 @@
  },
  {
   "source": "Restore it first to open it",
+  "plural": false
+ },
+ {
+  "source": "Restore the previous file chooser",
+  "plural": false
+ },
+ {
+  "source": "Restore the previous file chooser (%1)",
+  "plural": false
+ },
+ {
+  "source": "Restore the previous file manager",
+  "plural": false
+ },
+ {
+  "source": "Restore the previous file manager (%1)",
   "plural": false
  },
  {
@@ -1504,6 +1640,10 @@
   "plural": false
  },
  {
+  "source": "Search again",
+  "plural": false
+ },
+ {
   "source": "Search and open",
   "plural": false
  },
@@ -1517,6 +1657,18 @@
  },
  {
   "source": "Searching…",
+  "plural": false
+ },
+ {
+  "source": "Select",
+  "plural": false
+ },
+ {
+  "source": "Select a file",
+  "plural": false
+ },
+ {
+  "source": "Select a folder",
   "plural": false
  },
  {
@@ -1637,6 +1789,10 @@
  },
  {
   "source": "Skip",
+  "plural": false
+ },
+ {
+  "source": "smb://, sftp://, ftp://, dav:// or nfs:// and the server",
   "plural": false
  },
  {
@@ -1772,6 +1928,22 @@
   "plural": false
  },
  {
+  "source": "The file can't be read.",
+  "plural": false
+ },
+ {
+  "source": "The file can't be written.",
+  "plural": false
+ },
+ {
+  "source": "The file links to something that does not exist.",
+  "plural": false
+ },
+ {
+  "source": "The folder can't be created.",
+  "plural": false
+ },
+ {
   "source": "The folder is already a favorite",
   "plural": false
  },
@@ -1789,6 +1961,14 @@
  },
  {
   "source": "The object changed since it was read; reload before applying.",
+  "plural": false
+ },
+ {
+  "source": "The previous file chooser is back · restart xdg-desktop-portal to apply",
+  "plural": false
+ },
+ {
+  "source": "The previous file manager is back",
   "plural": false
  },
  {
@@ -1864,11 +2044,11 @@
   "plural": false
  },
  {
-  "source": "Type a single line without control characters.",
+  "source": "Type a name",
   "plural": false
  },
  {
-  "source": "Type smb://, sftp://, ftp://, dav:// or nfs:// and the server · Enter connects",
+  "source": "Type a single line without control characters.",
   "plural": false
  },
  {
@@ -1921,6 +2101,18 @@
  },
  {
   "source": "Use current context",
+  "plural": false
+ },
+ {
+  "source": "Use Flo",
+  "plural": false
+ },
+ {
+  "source": "Use Flo as the default file manager",
+  "plural": false
+ },
+ {
+  "source": "Use Flo as the file chooser",
   "plural": false
  },
  {

@@ -26,6 +26,12 @@ DYNAMIC = [
     # Saved folder views (core/folder_views.cpp), shown as they come.
     "Up to 256 folders keep a view; forget one first.", "Only local folders keep a view.",
     "The folder views file can't be changed.",
+    # Default applications (core/default_apps.cpp) and the file chooser's
+    # reasons (core/portal_service.cpp picker_choice), shown as they come.
+    "Not a valid type or application.", "The file can't be read.", "Nothing to restore.",
+    "The file links to something that does not exist.", "The folder can't be created.",
+    "The file can't be written.", "Not a valid portal backend.", "Flo's program path is unknown.",
+    "Select a folder", "Select a file", "Type a name", "A name can't contain \"/\"", "Nothing to save",
     # The favorites hub's buttons and the core's favorites sentences.
     "Enter", "Save", "Current", "Label", "Remove",
     "This folder is not a favorite.", "Type a single line without control characters.",
