@@ -135,9 +135,14 @@ fo::Rgb badge_color(const Entry &e) {
     return t.blue();
 }
 
+std::string sum_mark() {
+    const char *g = fo::glyph::available() ? fo::glyph::for_icon("sigma") : "";
+    return *g ? std::string(g) : std::string("\xE2\x88\x91");
+}
+
 std::string folder_summary(const Entry &e, const std::string &path) {
     if (const FolderSizes::Result *r = App::get().sizes().get(path))
-        return "\xE2\x88\x91 " + si_size(r->bytes);
+        return sum_mark() + " " + si_size(r->bytes);
     if (App::get().sizes().pending(path))
         return fo::tr("counting\xE2\x80\xA6");
     if (e.item_count >= 0)
@@ -416,7 +421,7 @@ void FileView::draw_row_item(int i, int X, int Y, int W, int H, const ItemState 
     if (c.size_w && !gone) {
         if (e.is_dir) {
             if (const FolderSizes::Result *r = App::get().sizes().get(path))
-                fo::text::draw("\xE2\x88\x91 " + si_size(r->bytes), X + c.size_x, Y, c.size_w, H, t.accent(),
+                fo::text::draw(sum_mark() + " " + si_size(r->bytes), X + c.size_x, Y, c.size_w, H, t.accent(),
                                fo::text::REGULAR, 11, FL_ALIGN_RIGHT);
         } else {
             std::string sz = si_size(uint64_t(std::max<int64_t>(0, e.size)));

@@ -88,7 +88,11 @@ std::string kind_word(const Entry &e);
 fo::Rgb badge_color(const Entry &e);
 // A folder in a large box (the preview window): Files' folder glyph.
 void draw_folder_card(int x, int y, int w, int h, fo::Rgb fill, fo::Rgb edge, int edge_px);
-// "∑ 4.2 kB" when the folder was measured, its item count otherwise.
+// The mark before a measured folder size: the Nerd Font's nf-md-sigma
+// (U+F04A0, through the toolkit's glyph table like every other icon) when
+// the UI font has the glyphs, a plain "∑" otherwise.
+std::string sum_mark();
+// "<sigma> 4.2 kB" when the folder was measured, its item count otherwise.
 std::string folder_summary(const Entry &e, const std::string &path);
 
 } // namespace flo::ui
