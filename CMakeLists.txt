@@ -31,6 +31,7 @@ option(FLO_BUILD_TESTS "Build the core tests" ON)
 # ---------------------------------------------------------------------------
 add_library(flo-core STATIC
   src/core/clipboard.cpp
+  src/core/default_apps.cpp
   src/core/dbus_service.cpp
   src/core/entry.cpp
   src/core/event_queue.cpp

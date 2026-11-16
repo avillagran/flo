@@ -296,6 +296,26 @@ std::string set_default_app(const std::string &mime, const std::string &id) {
     return ok ? std::string() : (why.empty() ? std::string("The default couldn't be changed.") : why);
 }
 
+std::string app_display_name(const std::string &id) {
+    if (id.empty())
+        return {};
+    GDesktopAppInfo *info = g_desktop_app_info_new(id.c_str());
+    if (!info)
+        return {};
+    const char *n = g_app_info_get_display_name(G_APP_INFO(info));
+    std::string name = n ? n : "";
+    g_object_unref(info);
+    return name;
+}
+
+std::string default_app_id(const std::string &mime) {
+    GAppInfo *def = g_app_info_get_default_for_type(mime.c_str(), FALSE);
+    std::string id = def && g_app_info_get_id(def) ? g_app_info_get_id(def) : "";
+    if (def)
+        g_object_unref(def);
+    return id;
+}
+
 std::string uri_list_for_drag(const std::vector<std::string> &paths) {
     std::string s;
     for (const auto &p : paths)

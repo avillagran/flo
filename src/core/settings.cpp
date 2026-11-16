@@ -152,6 +152,8 @@ void Settings::read_from(const Ini &ini) {
     if (c == "omarchy" || c == "square" || c == "rounded")
         corners = c;
     local_theme = ini.get("view", "theme") == "tokyo-night";
+    previous_file_manager = ini.get("defaults", "previous-file-manager");
+    previous_file_chooser = ini.get("defaults", "previous-file-chooser");
 }
 
 void Settings::write_to(Ini &ini) const {
@@ -170,6 +172,10 @@ void Settings::write_to(Ini &ini) const {
     ini.set("window", "maximized", window_maximized ? "true" : "false");
     ini.set("view", "corners", corners);
     ini.set("view", "theme", local_theme ? "tokyo-night" : "system");
+    if (!previous_file_manager.empty() || ini.has("defaults", "previous-file-manager"))
+        ini.set("defaults", "previous-file-manager", previous_file_manager);
+    if (!previous_file_chooser.empty() || ini.has("defaults", "previous-file-chooser"))
+        ini.set("defaults", "previous-file-chooser", previous_file_chooser);
     if (!rail_order.empty() || ini.has("rail", "order"))
         ini.set("rail", "order", rail_order::serialize(rail_order));
 }

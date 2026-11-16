@@ -81,6 +81,13 @@ public:
     // Files' "Change view": the views from the keyboard (the header's
     // overflow column when they are folded into it).
     void change_view();
+    // Preferences > Default applications (core/default_apps.h): confirmed,
+    // remembered and reversible.
+    std::vector<fo::MenuItem> defaults_items();
+    void use_flo_as_file_manager();
+    void restore_file_manager();
+    void use_flo_as_file_chooser();
+    void restore_file_chooser();
 
     // The session: this window's tabs (not the dual pane), and showing a
     // saved one. The owner window saves it again when it closes.

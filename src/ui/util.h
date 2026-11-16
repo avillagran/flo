@@ -84,6 +84,11 @@ bool launch_app(const std::string &id, const std::vector<std::string> &paths);
 // Returns an error sentence, or "" on success.
 std::string set_default_app(const std::string &mime, const std::string &id);
 
+// An application's name from its desktop id ("" when it is not installed).
+std::string app_display_name(const std::string &id);
+// The id of the system's default application for a type ("" for none).
+std::string default_app_id(const std::string &mime);
+
 // "file:///a\r\nfile:///b\r\n" for drags.
 std::string uri_list_for_drag(const std::vector<std::string> &paths);
 

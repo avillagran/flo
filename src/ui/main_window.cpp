@@ -1,5 +1,6 @@
 #include "ui/main_window.h"
 
+#include "core/default_apps.h"
 #include "core/fsutil.h"
 #include "core/network.h"
 #include "core/path_completion.h"
@@ -16,6 +17,7 @@
 #include "ui/operation_bar.h"
 #include "ui/file_view.h"
 #include "ui/pane.h"
+#include "ui/util.h"
 
 #include "fltk-omarchy/app.h"
 #include "fltk-omarchy/dialog.h"
@@ -31,8 +33,10 @@
 #include <FL/Fl_Input_.H>
 
 #include <sys/statvfs.h>
+#include <unistd.h>
 
 #include <algorithm>
+#include <cctype>
 #include <cstdio>
 #include <fstream>
 
@@ -1277,7 +1281,191 @@ std::vector<fo::MenuItem> MainWindow::preferences_items() {
         MenuItem(fo::tr("Window"), "", nullptr, window).with_icon("monitor"),
         MenuItem(fo::tr("Appearance"), "", nullptr, look).with_icon("tag"),
         MenuItem(fo::tr("Session and help"), "", nullptr, help).with_icon("save"),
+        MenuItem(fo::tr("Default applications"), "", nullptr, defaults_items()).with_icon("external-link"),
     };
+}
+
+// --- Preferences > Default applications -------------------------------------------
+//
+// Flo as the desktop's file manager (inode/directory in mimeapps.list) and
+// file chooser (xdg-desktop-portal's FileChooser). Each shows its state;
+// each change is confirmed first, remembers what it replaced and can put
+// it back. Nothing here runs unless the user picks it.
+
+namespace {
+
+std::string file_manager_id() {
+    std::string id = default_apps::user_default(default_apps::mimeapps_path(), default_apps::kDirectoryMime);
+    return id.empty() ? default_app_id(default_apps::kDirectoryMime) : id;
+}
+
+std::string app_label(const std::string &id) {
+    if (id.empty())
+        return fo::tr("none");
+    std::string name = app_display_name(id);
+    return name.empty() ? id : name;
+}
+
+std::string backend_label(const std::string &backend) {
+    if (backend.empty())
+        return fo::tr("none");
+    if (backend == default_apps::kPortalName)
+        return "Flo";
+    if (backend == "gtk")
+        return "GTK";
+    if (backend == "gnome")
+        return "GNOME";
+    if (backend == "kde")
+        return "KDE";
+    std::string b = backend;
+    b[0] = char(std::toupper(static_cast<unsigned char>(b[0])));
+    return b;
+}
+
+std::string self_exe() {
+    char buf[4096];
+    ssize_t n = readlink("/proc/self/exe", buf, sizeof buf - 1);
+    return n > 0 ? std::string(buf, size_t(n)) : std::string();
+}
+
+} // namespace
+
+std::vector<fo::MenuItem> MainWindow::defaults_items() {
+    using fo::MenuItem;
+    const Settings &s = App::get().settings();
+    const std::string fm = file_manager_id();
+    const bool fm_flo = fm == default_apps::kFloDesktopId;
+    const auto prev_fm = default_apps::Previous::decode(s.previous_file_manager);
+    const auto desk = default_apps::current_desktops();
+    const std::string fc = default_apps::file_chooser_backend(desk);
+    const bool fc_flo = fc == default_apps::kPortalName;
+    const auto prev_fc = default_apps::Previous::decode(s.previous_file_chooser);
+    std::vector<MenuItem> m;
+    m.push_back(MenuItem(fo::i18n::arg(fo::tr("Folders open with: %1"), app_label(fm))).disabled());
+    m.push_back(MenuItem(fo::tr("Use Flo as the default file manager"), "", [this] { use_flo_as_file_manager(); })
+                    .with_icon("folder")
+                    .check(fm_flo));
+    if (prev_fm.valid)
+        m.push_back(MenuItem(fo::i18n::arg(fo::tr("Restore the previous file manager (%1)"),
+                                           app_label(prev_fm.had ? prev_fm.value : std::string())),
+                             "", [this] { restore_file_manager(); })
+                        .with_icon("undo"));
+    m.push_back(MenuItem::separator());
+    m.push_back(MenuItem(fo::i18n::arg(fo::tr("File chooser: %1"), backend_label(fc))).disabled());
+    m.push_back(MenuItem(fo::tr("Use Flo as the file chooser"), "", [this] { use_flo_as_file_chooser(); })
+                    .with_icon("folder-open")
+                    .check(fc_flo));
+    if (prev_fc.valid)
+        m.push_back(MenuItem(fo::i18n::arg(fo::tr("Restore the previous file chooser (%1)"),
+                                           backend_label(prev_fc.had ? prev_fc.value : std::string())),
+                             "", [this] { restore_file_chooser(); })
+                        .with_icon("undo"));
+    return m;
+}
+
+void MainWindow::use_flo_as_file_manager() {
+    const std::string fm = file_manager_id();
+    if (fm == default_apps::kFloDesktopId) {
+        fo::Toast::show(this, fo::tr("Flo already opens folders"), 2.5);
+        return;
+    }
+    const std::string msg = fo::i18n::arg(
+        fo::tr("Folders open with %1 now. Flo will open them instead: only the inode/directory entry of "
+               "~/.config/mimeapps.list changes. You can restore %1 from Preferences \xE2\x86\x92 Default applications."),
+        app_label(fm));
+    fo::Dialog::confirm(this, fo::tr("Use Flo as the default file manager"), msg, fo::tr("Use Flo"), [this](bool ok) {
+        if (!ok)
+            return;
+        default_apps::Previous prev;
+        std::string err = default_apps::set_default(default_apps::mimeapps_path(), default_apps::kDirectoryMime,
+                                                    default_apps::kFloDesktopId, &prev);
+        if (!err.empty()) {
+            fo::Toast::show(this, fo::tr(err.c_str()), 4, fo::Toast::Error);
+            return;
+        }
+        App::get().settings().previous_file_manager = prev.encode();
+        App::get().save_settings();
+        fo::Toast::show(this, fo::tr("Flo is now the default file manager"), 3);
+    });
+}
+
+void MainWindow::restore_file_manager() {
+    const auto prev = default_apps::Previous::decode(App::get().settings().previous_file_manager);
+    if (!prev.valid)
+        return;
+    const std::string name = app_label(prev.had ? prev.value : std::string());
+    fo::Dialog::confirm(this, fo::tr("Restore the previous file manager"),
+                        fo::i18n::arg(fo::tr("Folders will open with %1 again, as before Flo was chosen."), name),
+                        fo::tr("Restore"), [this, prev](bool ok) {
+                            if (!ok)
+                                return;
+                            std::string err = default_apps::restore_default(default_apps::mimeapps_path(),
+                                                                            default_apps::kDirectoryMime, prev);
+                            if (!err.empty()) {
+                                fo::Toast::show(this, fo::tr(err.c_str()), 4, fo::Toast::Error);
+                                return;
+                            }
+                            App::get().settings().previous_file_manager.clear();
+                            App::get().save_settings();
+                            fo::Toast::show(this, fo::tr("The previous file manager is back"), 3);
+                        });
+}
+
+void MainWindow::use_flo_as_file_chooser() {
+    const auto desk = default_apps::current_desktops();
+    const std::string fc = default_apps::file_chooser_backend(desk);
+    if (fc == default_apps::kPortalName) {
+        fo::Toast::show(this, fo::tr("Flo is already the file chooser"), 2.5);
+        return;
+    }
+    std::string file = default_apps::portal_config_path(desk);
+    const std::string home = xdg::home();
+    if (file.compare(0, home.size() + 1, home + "/") == 0)
+        file = "~" + file.substr(home.size());
+    const std::string msg = fo::i18n::arg(
+        fo::i18n::arg(fo::tr("Apps that ask the desktop portal for files use %1 now. Flo will be registered as a "
+                             "portal backend for your user and named as the file chooser in %2; the other lines "
+                             "stay. Restart xdg-desktop-portal (systemctl --user restart xdg-desktop-portal) or log "
+                             "in again for apps to use it. You can restore %1 from here."),
+                      backend_label(fc)),
+        file);
+    fo::Dialog::confirm(this, fo::tr("Use Flo as the file chooser"), msg, fo::tr("Use Flo"), [this, desk](bool ok) {
+        if (!ok)
+            return;
+        std::string err = default_apps::install_portal_backend(self_exe());
+        default_apps::Previous prev;
+        if (err.empty())
+            err = default_apps::set_file_chooser(desk, default_apps::kPortalName, &prev);
+        if (!err.empty()) {
+            fo::Toast::show(this, fo::tr(err.c_str()), 4, fo::Toast::Error);
+            return;
+        }
+        App::get().settings().previous_file_chooser = prev.encode();
+        App::get().save_settings();
+        fo::Toast::show(this, fo::tr("Flo is the file chooser now \xC2\xB7 restart xdg-desktop-portal to apply"), 4);
+    });
+}
+
+void MainWindow::restore_file_chooser() {
+    const auto prev = default_apps::Previous::decode(App::get().settings().previous_file_chooser);
+    if (!prev.valid)
+        return;
+    const std::string name = backend_label(prev.had ? prev.value : std::string());
+    fo::Dialog::confirm(
+        this, fo::tr("Restore the previous file chooser"),
+        fo::i18n::arg(fo::tr("Apps will pick files with %1 again after xdg-desktop-portal restarts."), name),
+        fo::tr("Restore"), [this, prev](bool ok) {
+            if (!ok)
+                return;
+            std::string err = default_apps::restore_file_chooser(default_apps::current_desktops(), prev);
+            if (!err.empty()) {
+                fo::Toast::show(this, fo::tr(err.c_str()), 4, fo::Toast::Error);
+                return;
+            }
+            App::get().settings().previous_file_chooser.clear();
+            App::get().save_settings();
+            fo::Toast::show(this, fo::tr("The previous file chooser is back \xC2\xB7 restart xdg-desktop-portal to apply"), 4);
+        });
 }
 
 void MainWindow::actions_menu() {

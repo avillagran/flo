@@ -56,6 +56,9 @@ struct Settings {
     // Files' rail_order: the places and devices dragged to a new place in
     // the rail ([rail] order, keys from core/rail_order.h).
     std::vector<std::string> rail_order;
+    // What "Use Flo as the default file manager / file chooser" replaced
+    // (default_apps::Previous::encode()), for Restore ([defaults]).
+    std::string previous_file_manager, previous_file_chooser;
 
     static std::string path(); // $XDG_CONFIG_HOME/flo/flo.conf
     // Missing file or keys give the defaults; bad values are ignored.
