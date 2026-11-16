@@ -547,6 +547,7 @@ int run_preview(int argc, char **argv) {
     fo::InitOptions opts;
     opts.app_class = "flo-preview";
     fo::init(opts);
+    fo::icon::set_style(fo::icon::Style::Folio); // the icon line of the windows
     ui::apply_look(Settings::load());
     EventQueue queue;
     Fl::add_fd(queue.fd(), FL_READ, [](int, void *q) { static_cast<EventQueue *>(q)->dispatch(); }, &queue);

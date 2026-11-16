@@ -14,6 +14,7 @@
 #include "fltk-omarchy/app.h"
 #include "fltk-omarchy/dialog.h"
 #include "fltk-omarchy/i18n.h"
+#include "fltk-omarchy/icons.h"
 
 #include <FL/Fl.H>
 
@@ -343,6 +344,8 @@ void App::init_services() {
     fo::InitOptions opts;
     opts.app_class = "flo";
     fo::init(opts);
+    // Icons follow Folio's line (the layout, keys and texts stay Files').
+    fo::icon::set_style(fo::icon::Style::Folio);
     apply_look(settings_);
     g_prev_dispatch = Fl::event_dispatch();
     Fl::event_dispatch(flo_dispatch);

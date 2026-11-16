@@ -63,16 +63,17 @@ std::string display_name(const Entry &e) {
     return slash == std::string::npos ? e.name : e.name.substr(slash + 1);
 }
 
+// Folio's per-type glyphs (FileRow.qml): pictures, videos and music for
+// media, the documents page for PDFs and text, a plain page for the rest.
 std::string kind_icon(const Entry &e) {
     if (e.is_dir)
         return "folder";
     switch (e.kind) {
-    case Kind::Image: return "file-image";
-    case Kind::Video: return "file-video";
-    case Kind::Audio: return "file-music";
-    case Kind::Pdf: return "file-text";
-    case Kind::Text: return "file-code";
-    case Kind::Archive: return "file-archive";
+    case Kind::Image: return "pictures";
+    case Kind::Video: return "videos";
+    case Kind::Audio: return "music";
+    case Kind::Pdf:
+    case Kind::Text: return "documents";
     default: return "file";
     }
 }
@@ -113,11 +114,12 @@ void apply_look(const Settings &s) {
 
 std::string place_icon(const std::string &icon) {
     static const std::map<std::string, std::string> m = {
-        {"home", "home"},          {"documents", "file-text"}, {"downloads", "download"},
-        {"pictures", "image"},     {"music", "music"},         {"videos", "video"},
-        {"desktop", "database"},    {"templates", "file-plus"}, {"public", "share-2"},
-        {"dropbox", "cloud"},      {"recent", "clock"},        {"trash", "trash-2"},
-        {"drive", "hard-drive"},   {"removable", "usb"},       {"network", "globe"},
+        // Folio's names (its icon line); Files' extra places keep theirs.
+        {"home", "home"},          {"documents", "documents"}, {"downloads", "downloads"},
+        {"pictures", "pictures"},  {"music", "music"},         {"videos", "videos"},
+        {"desktop", "folder"},     {"templates", "file-plus"}, {"public", "share-2"},
+        {"dropbox", "cloud"},      {"recent", "recent"},       {"trash", "trash"},
+        {"drive", "drive"},        {"removable", "drive"},     {"network", "tailnet"},
         {"omarchy", "settings"},
     };
     auto it = m.find(icon);

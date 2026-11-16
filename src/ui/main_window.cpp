@@ -761,7 +761,7 @@ void MainWindow::update_header() {
     nav_->items({
         {"arrow-left", fo::tr("Back"), key(Cmd::Back), false, p->can_back(), [this] { active_pane()->back(); }},
         {"arrow-right", fo::tr("Forward"), key(Cmd::Forward), false, p->can_forward(), [this] { active_pane()->forward(); }},
-        {"arrow-up", fo::tr("Up"), key(Cmd::Parent), false, p->can_go_up(), [this] { active_pane()->go_up(); }},
+        {"chevron-up", fo::tr("Up"), key(Cmd::Parent), false, p->can_go_up(), [this] { active_pane()->go_up(); }},
     });
     using V = Pane::View;
     auto view = [this](V v) {
@@ -800,7 +800,7 @@ void MainWindow::update_header() {
     add({"grid", fo::tr("Grid"), key(Cmd::ViewGrid), v == V::Grid, true, view(V::Grid)}, 40, 1);
     add({"space", fo::tr("Space"), key(Cmd::ViewSpace), v == V::Space, true, view(V::Space)}, 40, 1);
     add({"columns", fo::tr("Columns"), key(Cmd::ViewColumns), v == V::Columns, true, view(V::Columns)}, 40, 1);
-    add({"info", fo::tr("Inspector"), key(Cmd::Inspector), details_on_ || dual_, true, [this] { toggle_details(); }},
+    add({"panel-right", fo::tr("Inspector"), key(Cmd::Inspector), details_on_ || dual_, true, [this] { toggle_details(); }},
         50);
     add({"actions", fo::tr("Actions"), key(Cmd::Actions), false, true, [this] { actions_menu(); }}, 90);
     add({"settings", fo::tr("Preferences"), key(Cmd::Settings), false, true, [this] { preferences_menu(); }}, 95);
@@ -1638,12 +1638,14 @@ static const char *const kFavoritesRow = "favorites:";
 // Files' "Connect…" row of the Network section.
 static const char *const kConnectRow = "net:connect";
 
-// Files' place glyphs (places_sidebar.rs place_glyph): by the place's
-// position in the list, not by its folder: Home, then download, document,
-// picture, music and film, and the database glyph for the rest.
-static const char *place_glyph(std::size_t index) {
-    static const char *const glyphs[] = {"home", "download", "file-text", "image", "music", "video"};
-    return index < 6 ? glyphs[index] : "database";
+// Place glyphs follow Folio's icon line (places.cpp): each XDG folder has
+// its own drawing wherever user-dirs points (documents, downloads,
+// pictures, music, videos), Home its house, anything else the folder.
+static const char *place_glyph(const Place &p) {
+    for (const char *k : {"home", "downloads", "documents", "pictures", "music", "videos"})
+        if (p.icon == k)
+            return k;
+    return "folder";
 }
 
 // The rail key of a Places or Devices row (core/rail_order.h).
@@ -1685,7 +1687,7 @@ void MainWindow::rebuild_sidebar() {
         for (const auto &p : pd.places)
             keys.push_back(rail_order::place_key(p.path, p.name));
         for (std::size_t i : rail_order::ordered_indices(keys, order))
-            rail_->add_row({fo::tr(pd.places[i].name.c_str()), place_glyph(i), pd.places[i].path});
+            rail_->add_row({fo::tr(pd.places[i].name.c_str()), place_glyph(pd.places[i]), pd.places[i].path});
     }
     marks_sec_ = rail_->add_section(fo::tr("Bookmarks"));
     for (const auto &p : pd.pinned)

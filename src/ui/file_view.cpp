@@ -54,10 +54,8 @@ Cells list_cells(int width, bool dual) {
 } // namespace
 
 void draw_folder_card(int x, int y, int w, int h, fo::Rgb fill, fo::Rgb edge, int edge_px) {
-    // Files draws folders as the Nerd folder glyph in blue.
-    (void)fill, (void)edge, (void)edge_px;
-    int s = std::min(w, h) * 2 / 3;
-    fo::icon::draw("folder", x + (w - s) / 2, y + (h - s) / 2, s, fo::theme().blue());
+    // Folio's flat folder (FileTile.qml), filled, outlined when marked.
+    fo::icon::draw_folder(x, y, w, h, fill, edge, edge_px);
 }
 
 AgeSection age_section(int64_t mtime_ns, int64_t now_s) {
@@ -351,10 +349,20 @@ void FileView::draw_tile_item(int i, int X, int Y, int W, int H, const ItemState
             : nullptr;
     if (page)
         draw_text_page(*page, ax, ay, aw, ah, s.selected);
-    if (!thumb && !page) {
-        int is = std::max(8, std::min(int(std::lround((e.is_dir ? 48 : 36) * zoom_)), ah - 4));
-        fo::icon::draw(e.is_dir ? "folder" : kind_icon(e), ax + (aw - is) / 2, ay + (ah - is) / 2, is,
-                       e.is_dir ? t.blue() : badge_color(e));
+    if (!thumb && !page && e.is_dir) {
+        // Folio's flat folder in the folder icon's place, as tall as it was:
+        // the card colour, tinted and outlined in the accent when marked.
+        int is = std::max(8, std::min(int(std::lround(48 * zoom_)), ah - 4));
+        int fw = std::min(aw, is * 4 / 3);
+        bool marked = s.selected || s.drop_target;
+        fo::Rgb fill = marked ? fo::mix(t.lighter_background(), t.accent(), 0.3)
+                       : s.hover > 0 ? fo::mix(t.lighter_background(), t.foreground(), 0.06 * s.hover)
+                                     : t.lighter_background();
+        draw_folder_card(ax + (aw - fw) / 2, ay + (ah - is) / 2, fw, is, fill, t.accent(),
+                         marked ? (s.drop_target ? 2 : 1) : 0);
+    } else if (!thumb && !page) {
+        int is = std::max(8, std::min(int(std::lround(36 * zoom_)), ah - 4));
+        fo::icon::draw(kind_icon(e), ax + (aw - is) / 2, ay + (ah - is) / 2, is, badge_color(e));
     }
     if (thumb) {
         if (Fl_RGB_Image *img = App::get().thumbs().get(path, e, kGridPx, aw, ah, false, this)) {

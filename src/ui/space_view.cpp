@@ -44,15 +44,16 @@ fo::RectF centre(const fo::RectF &full) {
     return rect_f(fx + fw * 3 / 8, fy + fh * 3 / 8, std::max(1, fw / 4), std::max(1, fh / 4));
 }
 
-// Files' Grid glyph of a kind (grid_view.rs type_glyph).
+// The glyph of a kind, after Folio's per-type icons (FileRow.qml).
 const char *tile_glyph(bool dir, int kind) {
     if (dir)
         return "folder";
     switch (Kind(kind)) {
-    case Kind::Image: return "image";
-    case Kind::Video: return "video";
+    case Kind::Image: return "pictures";
+    case Kind::Video: return "videos";
     case Kind::Audio: return "music";
-    case Kind::Pdf: return fo::glyph::available() ? "pdf" : "file-text";
+    case Kind::Pdf:
+    case Kind::Text: return "documents";
     default: return "file";
     }
 }
