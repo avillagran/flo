@@ -1,8 +1,9 @@
 // flo: entry point. Dispatch stays simple on purpose:
 //   1. CLI commands (src/cli.cpp) run without a display;
 //   2. `flo preview PATH` is the preview window's own process (src/ui/preview.cpp);
-//   3. otherwise a running Flo is asked to open the window (single instance);
-//   4. otherwise the GUI starts (src/ui/).
+//   3. `flo --portal` is the desktop portal's file chooser (src/ui/picker.cpp);
+//   4. otherwise a running Flo is asked to open the window (single instance);
+//   5. otherwise the GUI starts (src/ui/).
 
 #include "cli.h"
 #include "core/dbus_service.h"
@@ -35,6 +36,7 @@ static void start_location(int argc, char **argv, std::string &folder, std::stri
 // `restore`: no folder was given, so the last session comes back (Files).
 int run_gui(const std::string &folder, const std::string &select, bool restore); // src/ui/app.cpp
 int run_preview(int argc, char **argv);                             // src/ui/preview.cpp
+int run_portal();                                                   // src/ui/picker.cpp
 #endif
 
 int main(int argc, char **argv) {
@@ -43,6 +45,8 @@ int main(int argc, char **argv) {
 #ifdef FLO_HAVE_GUI
     if (argc >= 2 && std::string(argv[1]) == "preview")
         return run_preview(argc, argv);
+    if (argc >= 2 && std::string(argv[1]) == "--portal")
+        return run_portal();
 #endif
 
     std::string folder, select;

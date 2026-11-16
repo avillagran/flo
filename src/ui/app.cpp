@@ -6,6 +6,7 @@
 #include "core/xdg.h"
 #include "ui/main_window.h"
 #include "ui/pane.h"
+#include "ui/picker.h"
 #include "ui/strings.h"
 #include "ui/thumbs.h"
 
@@ -22,8 +23,11 @@
 #include <unistd.h>
 
 #include <algorithm>
+#include <chrono>
 #include <cerrno>
+#include <cstdio>
 #include <cstdlib>
+#include <utility>
 
 namespace flo::ui {
 
@@ -314,7 +318,7 @@ void App::save_session(MainWindow *w, bool quiet) {
                         ok ? fo::Toast::Info : fo::Toast::Error);
 }
 
-int App::run(const std::string &folder, const std::string &select, bool restore) {
+void App::init_services() {
     tune_malloc();
     settings_ = Settings::load();
     register_catalogs();
@@ -341,6 +345,78 @@ int App::run(const std::string &folder, const std::string &select, bool restore)
     places_.home = xdg::home();
     refresh_places();
     bookmarks_watch_ = watcher_->watch_file(places::bookmarks_path(), [this] { refresh_places(); });
+}
+
+MainWindow *App::open_picker(std::shared_ptr<PickerSession> s) {
+    std::string folder = s->req.current_folder;
+    if (folder.empty() || !is_dir(folder))
+        folder = xdg::home();
+    auto *win = new MainWindow(std::max(720, std::min(1100, settings_.window_width)),
+                               std::max(460, std::min(720, settings_.window_height)), folder, {});
+    win->start_picker(s);
+    windows_.push_back(win);
+    win->show();
+    if (s->req.kind != PickerRequest::Kind::Save && win->pane(0))
+        win->pane(0)->focus_view();
+    return win;
+}
+
+// `flo --portal`: the FileChooser backend. D-Bus starts it for
+// xdg-desktop-portal; it opens one picker window per request and leaves
+// after a minute without any (a later request starts it again).
+int App::run_portal() {
+    init_services();
+    fo::i18n::on_change([this] {
+        for (MainWindow *w : windows_)
+            w->language_changed();
+    });
+    portal_ = std::make_unique<PortalService>(
+        *queue_,
+        [this](PickerRequest req, PortalService::Reply reply) {
+            if (std::getenv("FLO_TRACE_PORTAL"))
+                std::fprintf(stderr, "flo portal: opening a picker for %s\n", req.handle.c_str());
+            auto s = std::make_shared<PickerSession>();
+            s->req = std::move(req);
+            s->reply = std::move(reply);
+            open_picker(s);
+        },
+        [this](const std::string &handle) {
+            // The portal closed the request: its window goes.
+            for (MainWindow *w : std::vector<MainWindow *>(windows_))
+                if (w->picker() && w->picker()->req.handle == handle) {
+                    w->picker()->answered = true; // already answered by the service
+                    w->hide();
+                }
+        });
+    bool lost = false;
+    portal_->start([&lost](bool owned) {
+        if (!owned)
+            lost = true;
+    });
+    const double idle_limit = std::getenv("FLO_PORTAL_IDLE") ? std::atof(std::getenv("FLO_PORTAL_IDLE")) : 60.0;
+    auto last_busy = std::chrono::steady_clock::now();
+    while (!lost) {
+        Fl::wait(1.0);
+        auto now = std::chrono::steady_clock::now();
+        if (!windows_.empty() || portal_->pending() > 0)
+            last_busy = now;
+        else if (std::chrono::duration<double>(now - last_busy).count() >= idle_limit)
+            break;
+    }
+    save_settings();
+    portal_.reset();
+    sizes_.reset();
+    thumbs_.reset();
+    thumb_service_.reset();
+    devices_.reset();
+    network_.reset();
+    watcher_.reset();
+    Fl::remove_fd(queue_->fd());
+    return lost ? 1 : 0;
+}
+
+int App::run(const std::string &folder, const std::string &select, bool restore) {
+    init_services();
 
     MainWindow *first = open_window(folder, select);
     if (restore) {

@@ -538,16 +538,26 @@ void Pane::landed(ListingPtr l, bool keep) {
         showing_cached_ = false;
         same = l->error.empty() && same_listing(model_.entries, l->entries);
     }
+    // The file chooser's filter (picker mode): what it doesn't accept
+    // stays out of the listing.
+    std::vector<Entry> picked;
+    const std::vector<Entry> *src = &l->entries;
+    if (win_->picking()) {
+        for (const auto &e : l->entries)
+            if (win_->picker_shows(e))
+                picked.push_back(e);
+        src = &picked;
+    }
     if (!same) {
         if (!filter_.empty()) {
-            all_ = l->entries;
+            all_ = *src;
             NameFilter f(filter_);
             model_.entries.clear();
             for (const auto &e : all_)
                 if (f.matches(e))
                     model_.entries.push_back(e);
         } else {
-            model_.entries = l->entries;
+            model_.entries = *src;
         }
         order_for_view();
     }
@@ -645,7 +655,7 @@ void Pane::remember_listing() {
 
 bool Pane::recall_listing() {
     showing_cached_ = false;
-    if (in_recents())
+    if (in_recents() || win_->picking())
         return false;
     CachedListing l;
     if (!App::get().listings().take(ListingCache::key(folder_, hidden_, sort_), l))
@@ -796,6 +806,8 @@ void Pane::open_path(const std::string &path) {
         navigate(path);
         return;
     }
+    if (win_->picker_open(path))
+        return; // the file chooser picks it
     if (in_trash_folder(path)) {
         fo::Toast::show(win_, fo::tr("Restore it first to open it"), 3);
         return;

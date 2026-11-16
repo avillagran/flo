@@ -2,6 +2,8 @@
 
 #include "core/default_apps.h"
 #include "core/fsutil.h"
+#include "core/portal_service.h"
+#include "core/uri.h"
 #include "core/network.h"
 #include "core/path_completion.h"
 #include "core/places.h"
@@ -17,6 +19,7 @@
 #include "ui/operation_bar.h"
 #include "ui/file_view.h"
 #include "ui/pane.h"
+#include "ui/picker.h"
 #include "ui/util.h"
 
 #include "fltk-omarchy/app.h"
@@ -579,12 +582,15 @@ void MainWindow::layout() {
     const int W = w(), H = h();
     int rw = rail_->desired_width();
     const int ob = opbar_height();
-    int body = std::max(40, H - kTop - kStatus - ob);
+    const int pb = picker_bar_ ? PickerBar::kHeight : 0;
+    int body = std::max(40, H - kTop - kStatus - ob - pb);
+    if (picker_bar_)
+        picker_bar_->resize(0, H - kStatus - pb, W, pb);
     rail_->resize(0, kTop, rw, body);
     tab_strip_->resize(0, kHeader, W, kTabs);
     status_->resize(0, H - kStatus, W, kStatus);
     if (ob) {
-        opbar_->resize(0, H - kStatus - ob, W, ob);
+        opbar_->resize(0, H - kStatus - pb - ob, W, ob);
         opbar_->space(active_pane()->view() == Pane::View::Space && !split());
         opbar_->show();
     } else {
@@ -657,7 +663,8 @@ void MainWindow::draw() {
     // Between the two panes of the dual view: a card-colored line.
     if (dual_ && !top_layer()) {
         const fo::Theme &t = fo::theme();
-        fo::paint::vline(dual_->x() - 1, kTop, h() - kTop - kStatus - opbar_height(), t.card());
+        fo::paint::vline(dual_->x() - 1, kTop, h() - kTop - kStatus - opbar_height() -
+                                                   (picker_bar_ ? PickerBar::kHeight : 0), t.card());
     }
 }
 
@@ -725,6 +732,15 @@ void MainWindow::run_operation(int i) {
 }
 
 void MainWindow::hide() {
+    if (picker_) {
+        // Closing the window cancels the request (once).
+        PickerResult r;
+        r.response = 1;
+        picker_->answer(r);
+        fo::Window::hide();
+        App::get().window_closed(this);
+        return;
+    }
     if (session_owner_ && !tabs_.empty())
         session_state().save(); // Files saves the session when its window closes
     if (shown() && !maximize_active()) {
@@ -1283,6 +1299,109 @@ std::vector<fo::MenuItem> MainWindow::preferences_items() {
         MenuItem(fo::tr("Session and help"), "", nullptr, help).with_icon("save"),
         MenuItem(fo::tr("Default applications"), "", nullptr, defaults_items()).with_icon("external-link"),
     };
+}
+
+// --- Picker mode (the portal's file chooser) ---------------------------------------
+
+void MainWindow::start_picker(std::shared_ptr<PickerSession> s) {
+    picker_ = std::move(s);
+    session_owner_ = false;
+    picker_->filter = picker_->req.current_filter >= 0 ? picker_->req.current_filter
+                                                       : picker_->req.filters.empty() ? -1 : 0;
+    begin();
+    picker_bar_ = new PickerBar(0, h() - kStatus - PickerBar::kHeight, w(), PickerBar::kHeight, this, picker_);
+    end();
+    const auto &r = picker_->req;
+    std::string title = r.title;
+    if (title.empty())
+        title = r.kind != PickerRequest::Kind::Open ? fo::tr("Save") : r.directory ? fo::tr("Select") : fo::tr("Open");
+    copy_label(("Flo \xC2\xB7 " + title).c_str());
+    picker_filter_changed();
+    layout();
+    if (r.kind == PickerRequest::Kind::Save)
+        picker_bar_->focus_name();
+}
+
+bool MainWindow::picker_shows(const Entry &e) const { return !picker_ || picker_->shows(e); }
+
+void MainWindow::picker_filter_changed() {
+    for (Pane *p : tabs_)
+        p->reload(true);
+    if (dual_)
+        dual_->reload(true);
+}
+
+bool MainWindow::picker_open(const std::string &path) {
+    if (!picker_)
+        return false;
+    const auto &r = picker_->req;
+    if (r.kind == PickerRequest::Kind::Save) {
+        picker_bar_->set_name(path_basename(path));
+        picker_bar_->focus_name();
+        return true;
+    }
+    if (r.kind == PickerRequest::Kind::SaveFiles || r.directory)
+        return true; // folders are what these pick
+    picker_finish({path_to_uri(path)});
+    return true;
+}
+
+void MainWindow::picker_accept() {
+    if (!picker_)
+        return;
+    Pane *p = active_pane();
+    std::vector<std::string> marked = p->selected_paths();
+    std::vector<bool> dirs;
+    for (const auto &m : marked)
+        dirs.push_back(is_dir(m));
+    if (picker_->req.kind == PickerRequest::Kind::Save)
+        marked.clear(), dirs.clear(); // the name and the folder shown decide
+    std::vector<std::string> uris;
+    std::string nav;
+    const std::string folder = is_virtual_folder(p->folder()) ? xdg::home() : p->folder();
+    std::string why = picker_choice(picker_->req, folder, marked, dirs, picker_bar_->name(), uris, nav);
+    if (!nav.empty()) {
+        p->navigate(nav);
+        return;
+    }
+    if (!why.empty()) {
+        fo::Toast::show(this, fo::tr(why.c_str()), 2.5, fo::Toast::Error);
+        return;
+    }
+    // Saving over something that exists asks first.
+    std::vector<std::string> existing;
+    if (picker_->saving())
+        for (const auto &u : uris)
+            if (exists_nofollow(uri_to_path(u)))
+                existing.push_back(path_basename(uri_to_path(u)));
+    if (existing.empty()) {
+        picker_finish(uris);
+        return;
+    }
+    std::string msg = existing.size() == 1
+                          ? fo::i18n::arg(fo::tr("%1 already exists. Saving replaces it."), "\xE2\x80\x9C" + existing[0] + "\xE2\x80\x9D")
+                          : fo::trn("%n of these names already exist. Saving replaces them.", int(existing.size()));
+    fo::Dialog::confirm(this, fo::tr("Replace?"), msg, fo::tr("Replace"), [this, uris](bool ok) {
+        if (ok)
+            picker_finish(uris);
+    }, true);
+}
+
+void MainWindow::picker_cancel() {
+    if (!picker_)
+        return;
+    hide(); // answers "cancelled"
+}
+
+void MainWindow::picker_finish(const std::vector<std::string> &uris) {
+    if (!picker_)
+        return;
+    PickerResult r;
+    r.response = 0;
+    r.uris = uris;
+    r.filter = picker_->filter;
+    picker_->answer(r);
+    hide();
 }
 
 // --- Preferences > Default applications -------------------------------------------

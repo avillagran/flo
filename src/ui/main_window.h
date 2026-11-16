@@ -14,6 +14,7 @@
 #include "fltk-omarchy/anim.h"
 #include "fltk-omarchy/window.h"
 
+#include <memory>
 #include <optional>
 #include <string>
 #include <vector>
@@ -30,10 +31,16 @@ struct MenuItem;
 struct SidebarRow;
 } // namespace fo
 
+namespace flo {
+struct Entry;
+}
+
 namespace flo::ui {
 
 class Pane;
 class DetailsPane;
+struct PickerSession;
+class PickerBar;
 
 // Files' shortcut profiles: menu accelerators written with Files' chords,
 // printed as the active profile binds the same commands.
@@ -93,6 +100,18 @@ public:
     // saved one. The owner window saves it again when it closes.
     Session session_state() const;
     void restore_session(const Session &s);
+    // Picker mode (Flo as the portal's file chooser, ui/picker.h): the
+    // window answers one request with its bottom bar.
+    void start_picker(std::shared_ptr<PickerSession> s);
+    bool picking() const { return picker_ != nullptr; }
+    const std::shared_ptr<PickerSession> &picker() const { return picker_; }
+    bool picker_shows(const Entry &e) const;
+    // A file opened in the browser: picked (Open) or named (Save). True
+    // when the picker took it.
+    bool picker_open(const std::string &path);
+    void picker_accept();
+    void picker_cancel();
+    void picker_filter_changed();
     void session_owner(bool on) { session_owner_ = on; }
     bool session_owner() const { return session_owner_; }
 
@@ -189,6 +208,9 @@ private:
     fo::Sidebar *rail_ = nullptr;
     fo::StatusBar *status_ = nullptr;
     class OperationBar *opbar_ = nullptr;
+    std::shared_ptr<PickerSession> picker_;
+    PickerBar *picker_bar_ = nullptr;
+    void picker_finish(const std::vector<std::string> &uris);
     // Files' MC bar (Ctrl+Alt+B): shown from the setting; its height when shown.
     void toggle_operation_bar();
     std::string operation_reason(int i);

@@ -105,7 +105,10 @@ EOF
   if [ -d "$run/run-media" ]; then
     sed -i "s|--bind \"$run\" \"$run\"|--bind \"$run\" \"$run\" --bind \"$run/run-media\" /run/media|" "$run/sandbox.sh"
   fi
-  Xvfb ":$disp" -screen 0 "${FLO_SESSION_SCREEN:-1440x900x24}" -nolisten tcp > "$run/xvfb.log" 2>&1 &
+  # Xvfb compiles its keymap into /tmp: a private /tmp keeps it off the
+  # host's (only the X socket directory is shared).
+  bwrap --dev-bind / / --tmpfs /tmp --bind /tmp/.X11-unix /tmp/.X11-unix --die-with-parent \
+    Xvfb ":$disp" -screen 0 "${FLO_SESSION_SCREEN:-1440x900x24}" -nolisten tcp > "$run/xvfb.log" 2>&1 &
   echo $! > "$run/xvfb.pid"
   sleep 1
   # bwrap dies with its parent: a waiting shell keeps it alive past this

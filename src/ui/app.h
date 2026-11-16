@@ -11,6 +11,7 @@
 #include "core/lister.h"
 #include "core/network.h"
 #include "core/places.h"
+#include "core/portal_service.h"
 #include "core/process.h"
 #include "core/settings.h"
 #include "core/thumbnail_service.h"
@@ -24,6 +25,7 @@
 namespace flo::ui {
 
 class MainWindow;
+struct PickerSession;
 class ThumbImages;
 class FolderSizes;
 
@@ -70,6 +72,11 @@ public:
     static App &get();
     // `restore`: Flo started without a folder (Files' session restore).
     int run(const std::string &folder, const std::string &select, bool restore = false);
+    // `flo --portal`: Flo as the desktop portal's file chooser (ui/picker.h).
+    int run_portal();
+    // A picker window for one portal request.
+    MainWindow *open_picker(std::shared_ptr<PickerSession> s);
+    bool portal_mode() const { return portal_ != nullptr; }
 
     EventQueue &queue() { return *queue_; }
     ThumbnailService &thumbnail_service() { return *thumb_service_; }
@@ -135,6 +142,8 @@ private:
     std::unique_ptr<Devices> devices_;
     std::unique_ptr<Network> network_;
     std::unique_ptr<DBusService> dbus_;
+    std::unique_ptr<PortalService> portal_;
+    void init_services();
     Settings settings_;
     FolderViews folder_views_;
     bool folder_views_loaded_ = false;
