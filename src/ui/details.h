@@ -45,7 +45,6 @@ private:
     void buttons(std::vector<Btn> &out) const;
     int hover_ = -1;
     struct Facts {
-        std::string text;       // opening lines of a text file
         std::string dimensions; // "1600 × 1200"
         std::string origin;     // trashed: where it came from
         int64_t deleted_at = 0;

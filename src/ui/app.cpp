@@ -8,6 +8,7 @@
 #include "ui/pane.h"
 #include "ui/picker.h"
 #include "ui/strings.h"
+#include "ui/text_previews.h"
 #include "ui/thumbs.h"
 
 #include "fltk-omarchy/app.h"
@@ -168,6 +169,12 @@ void App::window_closed(MainWindow *w) {
             preview_.close();
     }
     Fl::delete_widget(w);
+}
+
+TextPreviews &App::text_previews() {
+    if (!text_previews_)
+        text_previews_ = std::make_unique<TextPreviews>();
+    return *text_previews_;
 }
 
 ServerScan &App::server_scan() {

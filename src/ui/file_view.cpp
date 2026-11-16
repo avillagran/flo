@@ -2,6 +2,7 @@
 
 #include "ui/app.h"
 #include "ui/sizes.h"
+#include "ui/text_previews.h"
 #include "ui/thumbs.h"
 
 #include "core/fsutil.h"
@@ -301,6 +302,12 @@ void FileView::draw_badge(const Entry &e, const std::string &path, int x, int y,
             return;
         }
     }
+    // Text and code: their opening lines on a page, in the same slot.
+    if (App::get().settings().thumbnails && TextPreviews::wanted(e))
+        if (const auto *lines = App::get().text_previews().get(path, e, this)) {
+            draw_text_page(*lines, x + 2, y + 2, size - 4, size - 4);
+            return;
+        }
     int b = size - 4;
     fo::paint::round_fill(x + 2, y + 2, b, b, rounded(6), badge_color(e));
     std::string ext = e.extension();
@@ -338,7 +345,13 @@ void FileView::draw_tile_item(int i, int X, int Y, int W, int H, const ItemState
     // The icon is drawn here so it scales with the zoom (Files: 36 px x zoom).
     draw_tile(X, Y, W, H, s, "", display_name(e), detail, e.is_dir ? t.blue() : badge_color(e), false, &ax, &ay,
               &aw, &ah);
-    if (!thumb) {
+    const std::vector<std::string> *page =
+        !thumb && App::get().settings().thumbnails && TextPreviews::wanted(e)
+            ? App::get().text_previews().get(path, e, this)
+            : nullptr;
+    if (page)
+        draw_text_page(*page, ax, ay, aw, ah, s.selected);
+    if (!thumb && !page) {
         int is = std::max(8, std::min(int(std::lround((e.is_dir ? 48 : 36) * zoom_)), ah - 4));
         fo::icon::draw(e.is_dir ? "folder" : kind_icon(e), ax + (aw - is) / 2, ay + (ah - is) / 2, is,
                        e.is_dir ? t.blue() : badge_color(e));

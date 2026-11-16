@@ -28,6 +28,7 @@ namespace flo::ui {
 class MainWindow;
 struct PickerSession;
 class ThumbImages;
+class TextPreviews;
 class FolderSizes;
 
 // Keeps big short-lived buffers out of the heap (the window and the preview).
@@ -82,6 +83,8 @@ public:
     EventQueue &queue() { return *queue_; }
     ThumbnailService &thumbnail_service() { return *thumb_service_; }
     ThumbImages &thumbs() { return *thumbs_; }
+    // Text and code files' opening lines for the thumbnail slot.
+    TextPreviews &text_previews();
     // Folder sizes (Files' automatic sizes and Recalculate).
     FolderSizes &sizes() { return *sizes_; }
     Watcher &watcher() { return *watcher_; }
@@ -144,6 +147,7 @@ private:
     std::unique_ptr<EventQueue> queue_;
     std::unique_ptr<ThumbnailService> thumb_service_;
     std::unique_ptr<ThumbImages> thumbs_;
+    std::unique_ptr<TextPreviews> text_previews_;
     std::unique_ptr<FolderSizes> sizes_;
     std::unique_ptr<Watcher> watcher_;
     std::unique_ptr<Devices> devices_;

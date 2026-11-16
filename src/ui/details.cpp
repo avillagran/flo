@@ -6,6 +6,7 @@
 #include "core/fsutil.h"
 #include "core/trash.h"
 #include "ui/app.h"
+#include "ui/text_previews.h"
 #include "ui/file_view.h"
 #include "ui/pane.h"
 #include "ui/sizes.h"
@@ -161,11 +162,6 @@ void DetailsPane::describe() {
                 return;
             if (kind == Kind::Image)
                 facts->dimensions = image_dimensions(path);
-            if (kind == Kind::Text) {
-                std::string head = read_head(path, 4096);
-                if (head.find('\0') == std::string::npos)
-                    facts->text = head;
-            }
         },
         [this, facts, gen] {
             if (gen != generation_)
@@ -278,25 +274,11 @@ void DetailsPane::draw() {
         img->draw(ix + (iw - img->w()) / 2, ty + (ph - img->h()) / 2);
     } else if (entry_.is_dir) {
         fo::icon::draw("folder", ix + iw / 2 - 12, ty + ph / 2 - 12, 25, t.blue());
-    } else if (entry_.kind == Kind::Text && f.ready && !f.text.empty()) {
-        fl_push_clip(ix + 8, ty + 6, iw - 16, ph - 12);
-        fl_font(FL_COURIER, 9);
-        fl_color(t.foreground().fl());
-        int ly = ty + 6 + fl_height() - fl_descent();
-        size_t pos = 0;
-        while (pos < f.text.size() && ly < ty + ph) {
-            size_t nl = f.text.find('\n', pos);
-            std::string line = f.text.substr(pos, nl == std::string::npos ? std::string::npos : nl - pos);
-            for (auto &c : line)
-                if (c == '\t')
-                    c = ' ';
-            fl_draw(line.c_str(), ix + 8, ly);
-            ly += fl_height();
-            if (nl == std::string::npos)
-                break;
-            pos = nl + 1;
-        }
-        fl_pop_clip();
+    } else if (const auto *lines = App::get().settings().thumbnails && TextPreviews::wanted(entry_)
+                                       ? App::get().text_previews().get(path_, entry_, this)
+                                       : nullptr) {
+        // Text and code: the opening lines on a page, in the preview tile.
+        draw_text_page(*lines, ix, ty + 6, iw, ph - 12);
     } else {
         int bx = ix + iw / 2 - 24, by = ty + (ph - 48) / 2;
         fo::paint::round_fill(bx, by, 48, 48, r ? 10 : 0, badge_color(entry_));

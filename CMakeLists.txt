@@ -52,6 +52,7 @@ add_library(flo-core STATIC
   src/core/process.cpp
   src/core/recents.cpp
   src/core/search.cpp
+  src/core/text_preview.cpp
   src/core/server_scan.cpp
   src/core/session.cpp
   src/core/settings.cpp
