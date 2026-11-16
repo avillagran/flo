@@ -78,6 +78,9 @@ public:
 
     // Files: moves tab `from` to position `to` (Ctrl+Shift+PgUp/PgDn, drag).
     void move_tab(int from, int to);
+    // Files' "Change view": the views from the keyboard (the header's
+    // overflow column when they are folded into it).
+    void change_view();
 
     // The session: this window's tabs (not the dual pane), and showing a
     // saved one. The owner window saves it again when it closes.

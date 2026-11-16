@@ -18,6 +18,8 @@
 #                             for side-by-side screenshots with Files.
 #   FLO_SESSION_THEME=FILE    copies an Omarchy colors.toml into the private
 #                             home, so both apps draw the same palette.
+#   FLO_SESSION_SCREEN=WxHxD  the Xvfb screen (default 1440x900x24), e.g.
+#                             2000x1000x24 for a 1900 px wide window.
 # A RUN_DIR/run-media folder, if the setup makes one, is /run/media inside
 # the sandbox (for mountinfo fixtures of removable drives).
 #
@@ -103,7 +105,7 @@ EOF
   if [ -d "$run/run-media" ]; then
     sed -i "s|--bind \"$run\" \"$run\"|--bind \"$run\" \"$run\" --bind \"$run/run-media\" /run/media|" "$run/sandbox.sh"
   fi
-  Xvfb ":$disp" -screen 0 1440x900x24 -nolisten tcp > "$run/xvfb.log" 2>&1 &
+  Xvfb ":$disp" -screen 0 "${FLO_SESSION_SCREEN:-1440x900x24}" -nolisten tcp > "$run/xvfb.log" 2>&1 &
   echo $! > "$run/xvfb.pid"
   sleep 1
   # bwrap dies with its parent: a waiting shell keeps it alive past this

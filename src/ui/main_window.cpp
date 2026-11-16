@@ -51,8 +51,9 @@ Pane::View view_from_settings(ViewMode m) {
     return Pane::View::Groups;
 }
 
-// Files' header: the base right edge before the controls (toolbar.rs).
-int base_right(int w) { return w - 12 - (w < 640 ? 5 : 10) * 40 + 4 - 14; }
+// The narrowest the path chips get before toolbar buttons fold into the
+// overflow button: room for the current folder's name, elided.
+constexpr int kCrumbsMin = 120;
 
 // The filesystem type and free space under a folder, as Files' status bar
 // shows them ("ext4 · 640 GB free").
@@ -618,7 +619,13 @@ void MainWindow::layout() {
         field_ok_->hide();
         field_cancel_->hide();
         tools_->show();
-        tools_->allowance(std::max(0, std::min(160, base_right(W) - 176)));
+        // Files' header from the right: the buttons take what the path
+        // chips leave above kCrumbsMin; the rest fold into one button.
+        tools_->fit_width(std::max(36, W - 174 - kCrumbsMin));
+        bool only_views = tools_->overflowing();
+        for (int i : tools_->fold().folded)
+            only_views = only_views && tools_->items()[size_t(i)].group == 1;
+        tools_->overflow_label(only_views ? fo::tr("Views") : std::string());
         int pw = tools_->preferred_width();
         tools_->resize(W - 12 - pw, 10, pw, 36);
         int omni_w = std::max(1, W - 12 - pw - 14 - 132);
@@ -637,10 +644,7 @@ void MainWindow::layout() {
 }
 
 void MainWindow::resize(int X, int Y, int W, int H) {
-    bool narrow_changed = (W < 640) != (w() < 640);
     fo::Window::resize(X, Y, W, H);
-    if (narrow_changed)
-        update_header();
     layout();
 }
 
@@ -760,29 +764,25 @@ void MainWindow::update_header() {
          }},
         {"pencil", fo::tr("Edit path"), key(Cmd::Location), false, true, [this] { edit_path(); }},
     };
-    if (w() < 640) {
-        items.push_back({"groups", fo::tr("Views"), "", false, true, [this] {
-                             std::vector<fo::MenuItem> m;
-                             const char *names[] = {"Groups", "List", "Columns", "Space", "Grid"};
-                             const Cmd cmds[] = {Cmd::ViewGroups, Cmd::ViewList, Cmd::ViewColumns, Cmd::ViewSpace,
-                                                 Cmd::ViewGrid};
-                             for (int k = 0; k < 5; ++k)
-                                 m.push_back(fo::MenuItem(fo::tr(names[k]), primary_chord(ShortcutProfile::Files, cmds[k]), [this, k] {
-                                                 active_pane()->set_view(V(k));
-                                             }).check(active_pane()->view() == V(k)));
-                             open_menu_under(2, m);
-                         }});
-    } else {
-        items.push_back({"groups", fo::tr("Groups"), key(Cmd::ViewGroups), v == V::Groups, true, view(V::Groups)});
-        items.push_back({"list", fo::tr("List"), key(Cmd::ViewList), v == V::List, true, view(V::List)});
-        items.push_back({"grid", fo::tr("Grid"), key(Cmd::ViewGrid), v == V::Grid, true, view(V::Grid)});
-        items.push_back({"space", fo::tr("Space"), key(Cmd::ViewSpace), v == V::Space, true, view(V::Space)});
-        items.push_back({"columns", fo::tr("Columns"), key(Cmd::ViewColumns), v == V::Columns, true, view(V::Columns)});
-        items.push_back({"info", fo::tr("Inspector"), key(Cmd::Inspector), details_on_ || dual_, true,
-                         [this] { toggle_details(); }});
-    }
-    items.push_back({"actions", fo::tr("Actions"), key(Cmd::Actions), false, true, [this] { actions_menu(); }});
-    items.push_back({"settings", fo::tr("Preferences"), key(Cmd::Settings), false, true, [this] { preferences_menu(); }});
+    // Priorities for a narrow window (fit::fold_row): the view switcher
+    // (group 1) folds first, then the inspector and Edit path; Search,
+    // Actions and Preferences stay longest.
+    auto add = [&items](fo::ToolBar::Item it, int priority, int group = 0) {
+        it.priority = priority;
+        it.group = group;
+        items.push_back(std::move(it));
+    };
+    items[0].priority = 100;
+    items[1].priority = 60;
+    add({"groups", fo::tr("Groups"), key(Cmd::ViewGroups), v == V::Groups, true, view(V::Groups)}, 40, 1);
+    add({"list", fo::tr("List"), key(Cmd::ViewList), v == V::List, true, view(V::List)}, 40, 1);
+    add({"grid", fo::tr("Grid"), key(Cmd::ViewGrid), v == V::Grid, true, view(V::Grid)}, 40, 1);
+    add({"space", fo::tr("Space"), key(Cmd::ViewSpace), v == V::Space, true, view(V::Space)}, 40, 1);
+    add({"columns", fo::tr("Columns"), key(Cmd::ViewColumns), v == V::Columns, true, view(V::Columns)}, 40, 1);
+    add({"info", fo::tr("Inspector"), key(Cmd::Inspector), details_on_ || dual_, true, [this] { toggle_details(); }},
+        50);
+    add({"actions", fo::tr("Actions"), key(Cmd::Actions), false, true, [this] { actions_menu(); }}, 90);
+    add({"settings", fo::tr("Preferences"), key(Cmd::Settings), false, true, [this] { preferences_menu(); }}, 95);
     tools_->items(items);
     std::vector<fo::Breadcrumbs::Segment> segs;
     for (const auto &c : p->crumbs())
@@ -1206,6 +1206,7 @@ std::vector<fo::MenuItem> MainWindow::preferences_items() {
         MenuItem(fo::tr("Show hidden files"), "Ctrl+H", [this] { active_pane()->toggle_hidden(); })
             .with_icon("eye")
             .check(p->show_hidden()),
+        MenuItem(fo::tr("Change view"), "", [this] { change_view(); }).with_icon("groups"),
         MenuItem(fo::tr("Dual pane"), "F9", [this] { toggle_dual(); }).with_icon("columns").check(dual_ != nullptr),
         MenuItem(fo::tr("Zoom in Grid"), "Ctrl++", [this] { active_pane()->zoom_step(1); }).with_icon("plus"),
         MenuItem(fo::tr("Zoom out Grid"), "Ctrl+-", [this] { active_pane()->zoom_step(-1); }).with_icon("minus"),
@@ -1290,6 +1291,26 @@ void MainWindow::preferences_menu() {
 }
 
 void MainWindow::commands() { run_omnibar(">"); }
+
+// Files' "Cambiar vista" (Action::ViewMenu): from the keyboard, the folded
+// header column when the views are folded into it, a menu of the views
+// under the Groups button otherwise.
+void MainWindow::change_view() {
+    if (field_mode_ == Field::Path)
+        end_field(false);
+    if (tools_->folded(2) && tools_->open_overflow(true))
+        return;
+    using V = Pane::View;
+    std::vector<fo::MenuItem> m;
+    const char *names[] = {"Groups", "List", "Columns", "Space", "Grid"};
+    const Cmd cmds[] = {Cmd::ViewGroups, Cmd::ViewList, Cmd::ViewColumns, Cmd::ViewSpace, Cmd::ViewGrid};
+    for (int k = 0; k < 5; ++k)
+        m.push_back(fo::MenuItem(fo::tr(names[k]), primary_chord(ShortcutProfile::Files, cmds[k]), [this, k] {
+                        active_pane()->set_view(V(k));
+                        active_pane()->focus_view();
+                    }).check(active_pane()->view() == V(k)));
+    open_menu_under(2, m);
+}
 
 // --- Rail ------------------------------------------------------------------------------
 
