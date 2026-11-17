@@ -57,7 +57,7 @@ next and what is left out of this phase.
   pane (F9, F5/F6 to the other pane), Actions (F10) and Preferences
   (Ctrl+,) menus, the context menu, Insert / Ctrl+I / Ctrl+Shift+A
   selection tools, F2 rename, F7 new folder, Ctrl+N new file, drag and
-  drop, the SFTP password prompt, file operations with progress, conflict
+  drop (files dragged out reach other apps as `text/uri-list`), the SFTP password prompt, file operations with progress, conflict
   prompts and undo, and F1 for every shortcut. The live Omarchy theme and
   font apply throughout; the icons are Folio's line icons.
 - **Narrow windows**: the header's buttons fold by priority into one

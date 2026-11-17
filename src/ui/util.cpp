@@ -318,11 +318,4 @@ std::string default_app_id(const std::string &mime) {
     return id;
 }
 
-std::string uri_list_for_drag(const std::vector<std::string> &paths) {
-    std::string s;
-    for (const auto &p : paths)
-        s += path_to_uri(p) + "\r\n";
-    return s;
-}
-
 } // namespace flo::ui

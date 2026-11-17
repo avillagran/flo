@@ -21,6 +21,7 @@
 #include "ui/space_view.h"
 
 #include "fltk-omarchy/dialog.h"
+#include "fltk-omarchy/dnd.h"
 #include "fltk-omarchy/i18n.h"
 #include "fltk-omarchy/icons.h"
 #include "fltk-omarchy/menu.h"
@@ -1484,9 +1485,9 @@ void Pane::start_drag() {
     auto paths = selected_paths();
     if (paths.empty())
         return;
-    std::string text = uri_list_for_drag(paths);
-    Fl::copy(text.c_str(), int(text.size()), 0);
-    Fl::dnd();
+    // Offered as text/uri-list too, so other apps take the files (FLTK's
+    // own Fl::dnd() offers only text on Wayland).
+    fo::dnd::start_files(paths);
 }
 
 bool Pane::escape() {
