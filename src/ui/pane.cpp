@@ -1486,8 +1486,15 @@ void Pane::start_drag() {
     if (paths.empty())
         return;
     // Offered as text/uri-list too, so other apps take the files (FLTK's
-    // own Fl::dnd() offers only text on Wayland).
-    fo::dnd::start_files(paths);
+    // own Fl::dnd() offers only text on Wayland). The card under the
+    // pointer shows the pressed item, with the count when there are more.
+    fo::dnd::Preview card;
+    if (const Entry *e = current_entry()) {
+        card.label = display_name(*e);
+        card.icon = kind_icon(*e);
+        card.color = e->is_dir ? fo::theme().blue() : kind_color(*e);
+    }
+    fo::dnd::start_files(paths, card);
 }
 
 bool Pane::escape() {
